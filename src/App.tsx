@@ -694,6 +694,7 @@ export default function App() {
   const [editPortion, setEditPortion] = useState<'full' | 'half'>('full');
   const [editIngredientAdjustments, setEditIngredientAdjustments] = useState<{ [ingredientId: number]: 'none' | 'normal' | 'double' }>({});
   const [editNote, setEditNote] = useState('');
+  const [editQuantity, setEditQuantity] = useState<number>(1);
 
   // Scheduler States
   const [scheduleYear, setScheduleYear] = useState<number>(new Date().getFullYear());
@@ -1447,6 +1448,7 @@ export default function App() {
   // Helper to open cart item customization modal
   const handleEditCartItemClick = (item: OrderItem) => {
     setEditingCartItem(item);
+    setEditQuantity(item.quantity);
     if (item.custom_modifications) {
       setEditPortion(item.custom_modifications.portion);
       setEditIngredientAdjustments({ ...item.custom_modifications.ingredient_adjustments });
@@ -1492,6 +1494,7 @@ export default function App() {
       if (item.item_id === editingCartItem.item_id) {
         return {
           ...item,
+          quantity: editQuantity,
           custom_modifications: {
             portion: editPortion,
             ingredient_adjustments: editIngredientAdjustments,
@@ -7224,6 +7227,71 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Quantity Editor */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label className="input-label">Rendelési mennyiség</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <button 
+                      type="button"
+                      className="btn" 
+                      style={{ 
+                        width: '36px', 
+                        height: '36px', 
+                        padding: 0, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        fontSize: '18px', 
+                        fontWeight: 'bold',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        border: '1px solid var(--glass-border)',
+                        background: 'rgba(255,255,255,0.05)',
+                        color: 'white'
+                      }}
+                      onClick={() => setEditQuantity(q => Math.max(1, q - 1))}
+                    >
+                      -
+                    </button>
+                    <input 
+                      type="number" 
+                      className="input-field" 
+                      style={{ 
+                        width: '80px', 
+                        height: '36px', 
+                        textAlign: 'center', 
+                        fontSize: '14px', 
+                        fontWeight: 'bold',
+                        margin: 0
+                      }}
+                      value={editQuantity}
+                      onChange={e => setEditQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                    />
+                    <button 
+                      type="button"
+                      className="btn" 
+                      style={{ 
+                        width: '36px', 
+                        height: '36px', 
+                        padding: 0, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        fontSize: '18px', 
+                        fontWeight: 'bold',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        border: '1px solid var(--glass-border)',
+                        background: 'rgba(255,255,255,0.05)',
+                        color: 'white'
+                      }}
+                      onClick={() => setEditQuantity(q => q + 1)}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
                 {/* Dynamic Price Summary */}
                 <div style={{ marginTop: '10px', padding: '12px', background: 'rgba(10, 132, 255, 0.05)', border: '1px solid rgba(10, 132, 255, 0.15)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -7231,13 +7299,13 @@ export default function App() {
                       Egységár: {calculatedSinglePrice.toLocaleString()} FT (+csomagolás)
                     </span>
                     <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                      Mennyiség: {editingCartItem.quantity} db
+                      Mennyiség: {editQuantity} db
                     </span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                     <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Összesen</span>
                     <strong style={{ fontSize: '16px', color: 'var(--primary)' }}>
-                      {((calculatedSinglePrice + packFee) * editingCartItem.quantity).toLocaleString()} FT
+                      {((calculatedSinglePrice + packFee) * editQuantity).toLocaleString()} FT
                     </strong>
                   </div>
                 </div>
