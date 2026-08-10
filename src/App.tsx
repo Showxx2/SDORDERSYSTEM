@@ -47,6 +47,7 @@ interface Category {
   name: string;
   description?: string;
   is_active?: boolean;
+  linked_category_id?: number | null;
 }
 
 interface MenuItem {
@@ -74,6 +75,11 @@ interface OrderItem {
     note: string;
     extra_price: number;
     calculated_price: number;
+    linked_item?: {
+      item_id: number;
+      name: string;
+      price_at_order: number;
+    } | null;
   };
 }
 
@@ -739,6 +745,8 @@ export default function App() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [newCatName, setNewCatName] = useState('');
   const [newCatDescription, setNewCatDescription] = useState('');
+  const [newCatLinkedCategoryId, setNewCatLinkedCategoryId] = useState<number | 'none'>('none');
+  const [openCatLinkDropdown, setOpenCatLinkDropdown] = useState(false);
 
   // Food Item Filter States
   const [showFilterPanel, setShowFilterPanel] = useState(false);
