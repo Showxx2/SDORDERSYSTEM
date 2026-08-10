@@ -7133,7 +7133,7 @@ export default function App() {
 
         return (
           <div className="modal-overlay" style={{ position: 'fixed', zIndex: 10000 }} onClick={() => setEditingCartItem(null)}>
-            <div className="modal-card" style={{ width: baseMenuItem?.category_id && db.categories.find((c: any) => c.id === baseMenuItem.category_id)?.linked_category_id ? '650px' : '480px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-card" style={{ width: baseMenuItem?.category_id && db.categories.find((c: any) => c.id === baseMenuItem.category_id)?.linked_category_id ? '900px' : '480px' }} onClick={e => e.stopPropagation()}>
               <div className="modal-header">
                 <span className="modal-title">{editingCartItem.name} testreszabása</span>
                 <button className="island-close-btn" onClick={() => setEditingCartItem(null)}>
@@ -7348,8 +7348,6 @@ export default function App() {
                         gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
                         gap: '10px',
                         marginTop: '4px',
-                        maxHeight: '260px',
-                        overflowY: 'auto',
                         padding: '2px'
                       }}>
                         {/* Csatolmány nélkül Card */}
@@ -7524,7 +7522,7 @@ export default function App() {
 
         return (
           <div className="modal-overlay" onClick={() => setAttachingMenuItem(null)}>
-            <div className="modal-card" style={{ maxWidth: '750px', background: 'var(--panel-bg)', border: '1px solid var(--glass-border)', padding: '20px', display: 'block' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-card" style={{ maxWidth: '1000px', width: '90%', background: 'var(--panel-bg)', border: '1px solid var(--glass-border)', padding: '20px', display: 'block' }} onClick={e => e.stopPropagation()}>
               <div className="modal-header" style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                 <span className="modal-title" style={{ fontSize: '15px', fontWeight: 700 }}>
                   Csatolmány kiválasztása: {attachingMenuItem.name}
@@ -7546,8 +7544,6 @@ export default function App() {
                     gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
                     gap: '12px',
                     marginTop: '4px',
-                    maxHeight: '300px',
-                    overflowY: 'auto',
                     padding: '2px'
                   }}>
                     {/* Csatolmány nélkül Card */}
