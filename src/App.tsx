@@ -48,6 +48,7 @@ interface Category {
   description?: string;
   is_active?: boolean;
   linked_category_id?: number | null;
+  include_linked_packaging_fee?: boolean;
 }
 
 interface MenuItem {
@@ -744,6 +745,7 @@ export default function App() {
   const [newCatName, setNewCatName] = useState('');
   const [newCatDescription, setNewCatDescription] = useState('');
   const [newCatLinkedCategoryId, setNewCatLinkedCategoryId] = useState<number | 'none'>('none');
+  const [newCatIncludeLinkedPackagingFee, setNewCatIncludeLinkedPackagingFee] = useState(false);
   const [openCatLinkDropdown, setOpenCatLinkDropdown] = useState(false);
 
   // Food Item Filter States
@@ -1480,13 +1482,16 @@ export default function App() {
       }
 
       const calculated_single_price = item.price + (attachment ? attachment.price : 0);
+      const category = db.categories.find((c: any) => c.id === item.category_id);
+      const includeAttachmentPackFee = category?.include_linked_packaging_fee && attachment;
+      const finalPackagingFee = item.packaging_fee + (includeAttachmentPackFee ? attachment.packaging_fee : 0);
 
       return [...prev, {
         item_id: item.id,
         name: item.name,
         quantity: 1,
         price_at_order: item.price,
-        packaging_fee_at_order: item.packaging_fee,
+        packaging_fee_at_order: finalPackagingFee,
         custom_modifications: {
           portion: 'full',
           ingredient_adjustments: initialAdjustments,
@@ -1562,6 +1567,11 @@ export default function App() {
     const attachmentPrice = editLinkedItem ? editLinkedItem.price : 0;
     const calculated_single_price = Math.round(basePrice * (editPortion === 'half' ? 0.7 : 1.0)) + extra_price + attachmentPrice;
 
+    const category = baseMenuItem ? db.categories.find((c: any) => c.id === baseMenuItem.category_id) : null;
+    const includeAttachmentPackFee = category?.include_linked_packaging_fee && editLinkedItem;
+    const basePackFee = baseMenuItem ? baseMenuItem.packaging_fee : editingCartItem.packaging_fee_at_order;
+    const finalPackagingFee = basePackFee + (includeAttachmentPackFee ? editLinkedItem.packaging_fee : 0);
+
     const linkedItemVal = editLinkedItem ? {
       item_id: editLinkedItem.id,
       name: editLinkedItem.name,
@@ -1573,6 +1583,7 @@ export default function App() {
         return {
           ...item,
           quantity: editQuantity,
+          packaging_fee_at_order: finalPackagingFee,
           custom_modifications: {
             portion: editPortion,
             ingredient_adjustments: editIngredientAdjustments,
@@ -3873,6 +3884,8 @@ export default function App() {
                               setEditingCategory({ id: 0, name: '', description: '', is_active: true });
                               setNewCatName('');
                               setNewCatDescription('');
+                              setNewCatLinkedCategoryId('none');
+                              setNewCatIncludeLinkedPackagingFee(false);
                             }}
                           >
                             <Plus size={16} /> Új kategória hozzáadása
@@ -4202,6 +4215,29 @@ export default function App() {
                             />
                           </div>
 
+                          {newCatLinkedCategoryId !== 'none' && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
+                              <input 
+                                type="checkbox" 
+                                id="newCatIncludeLinkedPackagingFee"
+                                checked={newCatIncludeLinkedPackagingFee}
+                                onChange={e => setNewCatIncludeLinkedPackagingFee(e.target.checked)}
+                                style={{
+                                  width: '18px',
+                                  height: '18px',
+                                  accentColor: '#bf5af2',
+                                  cursor: 'pointer'
+                                }}
+                              />
+                              <label 
+                                htmlFor="newCatIncludeLinkedPackagingFee" 
+                                style={{ fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}
+                              >
+                                Csatolt csomagolási díj felszámítása
+                              </label>
+                            </div>
+                          )}
+
                           <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>
                             <button className="btn" onClick={() => setEditingCategory(null)}>Mégse</button>
                             <button 
@@ -4219,14 +4255,16 @@ export default function App() {
                                     name: nameTrimmed,
                                     description: newCatDescription.trim(),
                                     is_active: true,
-                                    linked_category_id: newCatLinkedCategoryId === 'none' ? null : newCatLinkedCategoryId
+                                    linked_category_id: newCatLinkedCategoryId === 'none' ? null : newCatLinkedCategoryId,
+                                    include_linked_packaging_fee: newCatLinkedCategoryId === 'none' ? false : newCatIncludeLinkedPackagingFee
                                   });
                                 } else {
                                   updated = db.categories.map((c: any) => c.id === editingCategory.id ? {
                                     ...c,
                                     name: nameTrimmed,
                                     description: newCatDescription.trim(),
-                                    linked_category_id: newCatLinkedCategoryId === 'none' ? null : newCatLinkedCategoryId
+                                    linked_category_id: newCatLinkedCategoryId === 'none' ? null : newCatLinkedCategoryId,
+                                    include_linked_packaging_fee: newCatLinkedCategoryId === 'none' ? false : newCatIncludeLinkedPackagingFee
                                   } : c);
                                 }
 
@@ -4565,6 +4603,8 @@ export default function App() {
                                           setEditingCategory(cat);
                                           setNewCatName(cat.name);
                                           setNewCatDescription(cat.description || '');
+                                          setNewCatLinkedCategoryId(cat.linked_category_id !== undefined && cat.linked_category_id !== null ? cat.linked_category_id : 'none');
+                                          setNewCatIncludeLinkedPackagingFee(cat.include_linked_packaging_fee || false);
                                         }}
                                       >
                                         Szerkeszt
@@ -7096,7 +7136,10 @@ export default function App() {
       {editingCartItem && (() => {
         const baseMenuItem = db.items.find((i: any) => i.id === editingCartItem.item_id);
         const basePrice = baseMenuItem ? baseMenuItem.price : editingCartItem.price_at_order;
-        const packFee = editingCartItem.packaging_fee_at_order;
+        const category = baseMenuItem ? db.categories.find((c: any) => c.id === baseMenuItem.category_id) : null;
+        const includeAttachmentPackFee = category?.include_linked_packaging_fee && editLinkedItem;
+        const basePackFee = baseMenuItem ? baseMenuItem.packaging_fee : editingCartItem.packaging_fee_at_order;
+        const packFee = basePackFee + (includeAttachmentPackFee ? editLinkedItem.packaging_fee : 0);
 
         let extraPrice = 0;
         Object.keys(editIngredientAdjustments).forEach((key) => {
@@ -7484,14 +7527,14 @@ export default function App() {
                 <div style={{ marginTop: '10px', padding: '12px', background: 'rgba(10, 132, 255, 0.05)', border: '1px solid rgba(10, 132, 255, 0.15)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                      Egységár: {calculatedSinglePrice.toLocaleString()} FT (+csomagolás)
+                      Egységár: {calculatedSinglePrice.toLocaleString()} FT + Csomagolás: {packFee.toLocaleString()} FT
                     </span>
                     <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
                       Mennyiség: {editQuantity} db
                     </span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Összesen</span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Összesen (csomagolással)</span>
                     <strong style={{ fontSize: '16px', color: 'var(--primary)' }}>
                       {((calculatedSinglePrice + packFee) * editQuantity).toLocaleString()} FT
                     </strong>
@@ -7610,22 +7653,33 @@ export default function App() {
                 </div>
 
                 {/* Display Single Item and total price summary */}
-                <div style={{ marginTop: '6px', padding: '12px', background: 'rgba(10, 132, 255, 0.05)', border: '1px solid rgba(10, 132, 255, 0.15)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                      Alapár: {attachingMenuItem.price.toLocaleString()} FT
-                    </span>
-                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                      Csatolmány: {selectedAttachmentItem ? `+${selectedAttachmentItem.price.toLocaleString()} FT` : 'Nincs (+0 FT)'}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Fizetendő összeg</span>
-                    <strong style={{ fontSize: '16px', color: 'var(--primary)' }}>
-                      {(attachingMenuItem.price + (selectedAttachmentItem ? selectedAttachmentItem.price : 0)).toLocaleString()} FT
-                    </strong>
-                  </div>
-                </div>
+                {(() => {
+                  const itemCategory = db.categories.find((c: any) => c.id === attachingMenuItem.category_id);
+                  const includePackFee = itemCategory?.include_linked_packaging_fee && selectedAttachmentItem;
+                  const totalPackaging = attachingMenuItem.packaging_fee + (includePackFee ? selectedAttachmentItem.packaging_fee : 0);
+                  const totalWithPack = attachingMenuItem.price + (selectedAttachmentItem ? selectedAttachmentItem.price : 0) + totalPackaging;
+
+                  return (
+                    <div style={{ marginTop: '6px', padding: '12px', background: 'rgba(10, 132, 255, 0.05)', border: '1px solid rgba(10, 132, 255, 0.15)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                          Alapár: {attachingMenuItem.price.toLocaleString()} FT + Csomagolás: {attachingMenuItem.packaging_fee.toLocaleString()} FT
+                        </span>
+                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                          Csatolmány: {selectedAttachmentItem ? `+${selectedAttachmentItem.price.toLocaleString()} FT` : 'Nincs (+0 FT)'}
+                          {includePackFee && ` (Csomagolás: +${selectedAttachmentItem.packaging_fee.toLocaleString()} FT)`}
+                          {selectedAttachmentItem && !includePackFee && ` (Csomagolás: ingyenes)`}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                        <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Összesen (csomagolással)</span>
+                        <strong style={{ fontSize: '16px', color: 'var(--primary)' }}>
+                          {totalWithPack.toLocaleString()} FT
+                        </strong>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="modal-footer" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px', marginTop: '14px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
