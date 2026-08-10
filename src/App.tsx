@@ -7354,7 +7354,7 @@ export default function App() {
                         <div 
                           style={{
                             background: !editLinkedItem ? 'rgba(10, 132, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
-                            border: !editLinkedItem ? '2px solid var(--primary)' : '1px solid var(--glass-border)',
+                            border: !editLinkedItem ? '2px solid var(--primary)' : '2px solid rgba(255, 255, 255, 0.08)',
                             borderRadius: '10px',
                             padding: '12px',
                             cursor: 'pointer',
@@ -7384,7 +7384,7 @@ export default function App() {
                               key={attItem.id}
                               style={{
                                 background: isSelected ? 'rgba(10, 132, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
-                                border: isSelected ? '2px solid var(--primary)' : '1px solid var(--glass-border)',
+                                border: isSelected ? '2px solid var(--primary)' : '2px solid rgba(255, 255, 255, 0.08)',
                                 borderRadius: '10px',
                                 padding: '12px',
                                 cursor: 'pointer',
@@ -7550,7 +7550,7 @@ export default function App() {
                     <div 
                       style={{
                         background: !selectedAttachmentItem ? 'rgba(10, 132, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
-                        border: !selectedAttachmentItem ? '2px solid var(--primary)' : '1px solid var(--glass-border)',
+                        border: !selectedAttachmentItem ? '2px solid var(--primary)' : '2px solid rgba(255, 255, 255, 0.08)',
                         borderRadius: '12px',
                         padding: '16px',
                         cursor: 'pointer',
@@ -7580,7 +7580,7 @@ export default function App() {
                           key={attItem.id}
                           style={{
                             background: isSelected ? 'rgba(10, 132, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
-                            border: isSelected ? '2px solid var(--primary)' : '1px solid var(--glass-border)',
+                            border: isSelected ? '2px solid var(--primary)' : '2px solid rgba(255, 255, 255, 0.08)',
                             borderRadius: '12px',
                             padding: '16px',
                             cursor: 'pointer',
