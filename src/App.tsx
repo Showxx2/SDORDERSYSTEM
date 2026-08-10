@@ -68,6 +68,13 @@ interface OrderItem {
   quantity: number;
   price_at_order: number;
   packaging_fee_at_order: number;
+  custom_modifications?: {
+    portion: 'full' | 'half';
+    ingredient_adjustments: { [ingredientId: number]: 'none' | 'normal' | 'double' };
+    note: string;
+    extra_price: number;
+    calculated_price: number;
+  };
 }
 
 interface Order {
@@ -139,6 +146,64 @@ const renderUserIcon = (symbol: string, size = 16, color = 'white') => {
     default:
       return <User size={size} style={{ color }} />;
   }
+};
+
+const renderKitchenItemModifications = (item: OrderItem, inventory: any[]) => {
+  if (!item.custom_modifications) return null;
+  const { portion, ingredient_adjustments, note } = item.custom_modifications;
+
+  const doubleIngs: string[] = [];
+  const removedIngs: string[] = [];
+  Object.keys(ingredient_adjustments || {}).forEach(key => {
+    const ingId = Number(key);
+    const adj = ingredient_adjustments[ingId];
+    if (adj === 'double' || adj === 'none') {
+      const invItem = inventory.find((inv: any) => inv.id === ingId);
+      if (invItem) {
+        if (adj === 'double') doubleIngs.push(invItem.name);
+        if (adj === 'none') removedIngs.push(invItem.name);
+      }
+    }
+  });
+
+  if (portion !== 'half' && doubleIngs.length === 0 && removedIngs.length === 0 && !note) {
+    return null;
+  }
+
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '3px',
+      marginTop: '4px',
+      padding: '6px',
+      background: 'rgba(255,255,255,0.03)',
+      borderLeft: '3px solid #ff9f0a',
+      borderRadius: '4px',
+      textAlign: 'left'
+    }}>
+      {portion === 'half' && (
+        <span style={{ color: '#ff9f0a', fontWeight: 'bold', fontSize: '10px' }}>
+          🔸 FÉL ADAG (70%-os méret)
+        </span>
+      )}
+      {doubleIngs.length > 0 && (
+        <span style={{ color: '#30d158', fontWeight: 600, fontSize: '10px' }}>
+          ➕ DUPLA: {doubleIngs.join(', ')}
+        </span>
+      )}
+      {removedIngs.length > 0 && (
+        <span style={{ color: '#ff453a', fontWeight: 600, fontSize: '10px', textDecoration: 'line-through' }}>
+          ❌ NÉLKÜL: {removedIngs.join(', ')}
+        </span>
+      )}
+      {note && (
+        <span style={{ color: '#64d2ff', fontStyle: 'italic', fontSize: '10px', background: 'rgba(100,210,255,0.1)', padding: '2px 4px', borderRadius: '3px', marginTop: '2px', wordBreak: 'break-all' }}>
+          💬 Megjegyzés: "{note}"
+        </span>
+      )}
+    </div>
+  );
 };
 
 const getPaymentMethodIcon = (method: string, size = 14) => {
@@ -571,6 +636,7 @@ export default function App() {
   const [invItemFreqValue, setInvItemFreqValue] = useState<number>(7);
   const [invItemFreqUnit, setInvItemFreqUnit] = useState<'day' | 'week'>('day');
   const [invItemProcurement, setInvItemProcurement] = useState(false);
+  const [invItemDoubleExtraPrice, setInvItemDoubleExtraPrice] = useState<number>(0);
 
   // Form bindings for Inventory Category modal
   const [invCatName, setInvCatName] = useState('');
@@ -622,6 +688,12 @@ export default function App() {
   const [portalCookTimerMins, setPortalCookTimerMins] = useState<number>(20);
   const [portalCookCourierId, setPortalCookCourierId] = useState<number | null>(null);
   const [portalCourierFilter, setPortalCourierFilter] = useState<'all_progress' | 'all_delivery' | 'my_orders'>('all_progress');
+
+  // Cart Item Customization States
+  const [editingCartItem, setEditingCartItem] = useState<OrderItem | null>(null);
+  const [editPortion, setEditPortion] = useState<'full' | 'half'>('full');
+  const [editIngredientAdjustments, setEditIngredientAdjustments] = useState<{ [ingredientId: number]: 'none' | 'normal' | 'double' }>({});
+  const [editNote, setEditNote] = useState('');
 
   // Scheduler States
   const [scheduleYear, setScheduleYear] = useState<number>(new Date().getFullYear());
@@ -1372,6 +1444,69 @@ export default function App() {
     });
   };
 
+  // Helper to open cart item customization modal
+  const handleEditCartItemClick = (item: OrderItem) => {
+    setEditingCartItem(item);
+    if (item.custom_modifications) {
+      setEditPortion(item.custom_modifications.portion);
+      setEditIngredientAdjustments({ ...item.custom_modifications.ingredient_adjustments });
+      setEditNote(item.custom_modifications.note);
+    } else {
+      setEditPortion('full');
+      setEditNote('');
+      
+      // Initialize with default ingredients for this item from MenuItem
+      const menuItem = db.items.find((i: any) => i.id === item.item_id);
+      const initialAdjustments: { [key: number]: 'none' | 'normal' | 'double' } = {};
+      if (menuItem && menuItem.ingredients) {
+        menuItem.ingredients.forEach((ing: any) => {
+          initialAdjustments[ing.ingredientId] = 'normal';
+        });
+      }
+      setEditIngredientAdjustments(initialAdjustments);
+    }
+  };
+
+  // Helper to save customizations of cart item
+  const handleSaveCartItemCustomizations = () => {
+    if (!editingCartItem) return;
+
+    const baseMenuItem = db.items.find((i: any) => i.id === editingCartItem.item_id);
+    const basePrice = baseMenuItem ? baseMenuItem.price : editingCartItem.price_at_order;
+
+    let extra_price = 0;
+    Object.keys(editIngredientAdjustments).forEach((key) => {
+      const ingId = Number(key);
+      const adjustment = editIngredientAdjustments[ingId];
+      if (adjustment === 'double') {
+        const invItem = db.inventory.find((i: any) => i.id === ingId);
+        if (invItem) {
+          extra_price += (invItem.double_extra_price || 0);
+        }
+      }
+    });
+
+    const calculated_single_price = Math.round(basePrice * (editPortion === 'half' ? 0.7 : 1.0)) + extra_price;
+
+    setCart(prev => prev.map(item => {
+      if (item.item_id === editingCartItem.item_id) {
+        return {
+          ...item,
+          custom_modifications: {
+            portion: editPortion,
+            ingredient_adjustments: editIngredientAdjustments,
+            note: editNote,
+            extra_price: extra_price,
+            calculated_price: calculated_single_price
+          }
+        };
+      }
+      return item;
+    }));
+
+    setEditingCartItem(null);
+  };
+
   // Remove Item from Cart
   const removeFromCart = (itemId: number) => {
     setCart(prev => {
@@ -1398,7 +1533,10 @@ export default function App() {
   const submitOrder = () => {
     if (cart.length === 0) return;
 
-    const subtotal = cart.reduce((sum, item) => sum + (item.price_at_order + item.packaging_fee_at_order) * item.quantity, 0);
+    const subtotal = cart.reduce((sum, item) => {
+      const price = item.custom_modifications ? item.custom_modifications.calculated_price : item.price_at_order;
+      return sum + (price + item.packaging_fee_at_order) * item.quantity;
+    }, 0);
     const discountAmount = subtotal * (discountPercentage / 100);
     const finalAmount = Math.max(0, Math.round(subtotal - discountAmount) + deliveryFee);
 
@@ -2097,8 +2235,13 @@ export default function App() {
                               <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
                                 📍 {order.customer_name} - {order.customer_address}
                               </div>
-                              <div style={{ fontSize: '11px', color: 'white', borderTop: '1px dashed rgba(255,255,255,0.06)', paddingTop: '6px', marginBottom: '8px' }}>
-                                {order.items.map((i: OrderItem) => `${i.quantity}x ${i.name}`).join(', ')}
+                              <div style={{ fontSize: '11px', color: 'white', borderTop: '1px dashed rgba(255,255,255,0.06)', paddingTop: '6px', marginBottom: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                {order.items.map((i: OrderItem, idx: number) => (
+                                  <div key={idx} style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontWeight: 600 }}>{i.quantity}x {i.name}</span>
+                                    {renderKitchenItemModifications(i, db.inventory)}
+                                  </div>
+                                ))}
                               </div>
                               
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2360,23 +2503,29 @@ export default function App() {
                   <div style={{ color: 'var(--text-secondary)' }}>Fizetés: {order.total_amount.toLocaleString()} FT ({order.payment_method})</div>
                 </div>
 
-                <div style={{
-                  background: 'rgba(255,255,255,0.02)',
-                  border: '1px solid rgba(255,255,255,0.04)',
-                  borderRadius: '6px',
-                  padding: '10px',
-                  maxHeight: '100px',
-                  overflowY: 'auto',
-                  fontSize: '11px',
-                  color: 'white'
-                }}>
-                  {order.items.map((i: OrderItem, idx: number) => (
-                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
-                      <span>{i.name}</span>
-                      <span style={{ fontWeight: 600 }}>{i.quantity} db</span>
-                    </div>
-                  ))}
-                </div>
+                 <div style={{
+                   background: 'rgba(255,255,255,0.02)',
+                   border: '1px solid rgba(255,255,255,0.04)',
+                   borderRadius: '6px',
+                   padding: '10px',
+                   maxHeight: '180px',
+                   overflowY: 'auto',
+                   fontSize: '11px',
+                   color: 'white',
+                   display: 'flex',
+                   flexDirection: 'column',
+                   gap: '6px'
+                 }}>
+                   {order.items.map((i: OrderItem, idx: number) => (
+                     <div key={idx} style={{ borderBottom: idx < order.items.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', paddingBottom: '4px', display: 'flex', flexDirection: 'column' }}>
+                       <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                         <span style={{ fontWeight: 600 }}>{i.name}</span>
+                         <span>{i.quantity} db</span>
+                       </div>
+                       {renderKitchenItemModifications(i, db.inventory)}
+                     </div>
+                   ))}
+                 </div>
 
                 {portalView === 'kitchen' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
@@ -2738,7 +2887,10 @@ export default function App() {
                           </span>
                           <div style={{ marginTop: '6px', fontSize: '11px' }}>
                             {order.items.map((i, idx) => (
-                              <div key={idx}>{i.quantity}x {i.name}</div>
+                              <div key={idx} style={{ marginBottom: '2px' }}>
+                                <strong>{i.quantity}x {i.name}</strong>
+                                {renderKitchenItemModifications(i, db.inventory)}
+                              </div>
                             ))}
                           </div>
                         </div>
@@ -3157,30 +3309,71 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="cart-items">
-                    {cart.map((item: OrderItem) => (
-                      <div key={item.item_id} className="cart-item">
-                        <div className="cart-item-info">
-                          <span className="cart-item-qty">{item.quantity}x</span>
-                          <span className="cart-item-name" title={item.name}>{item.name}</span>
+                    {cart.map((item: OrderItem) => {
+                      const itemPrice = item.custom_modifications ? item.custom_modifications.calculated_price : item.price_at_order;
+                      return (
+                        <div 
+                          key={item.item_id} 
+                          className="cart-item" 
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => handleEditCartItemClick(item)}
+                        >
+                          <div className="cart-item-info">
+                            <span className="cart-item-qty">{item.quantity}x</span>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span className="cart-item-name" title={item.name}>{item.name}</span>
+                              {item.custom_modifications && (
+                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '1px', marginTop: '2px' }}>
+                                  {item.custom_modifications.portion === 'half' && (
+                                    <span style={{ color: '#ff9f0a' }}>🔸 Fél adag (70%)</span>
+                                  )}
+                                  {Object.keys(item.custom_modifications.ingredient_adjustments).map(key => {
+                                    const ingId = Number(key);
+                                    const adj = item.custom_modifications!.ingredient_adjustments[ingId];
+                                    if (adj === 'normal') return null;
+                                    const invItem = db.inventory.find((i: any) => i.id === ingId);
+                                    if (!invItem) return null;
+                                    return (
+                                      <span key={ingId} style={{ color: adj === 'double' ? '#30d158' : '#ff453a' }}>
+                                        {adj === 'double' ? `+ Dupla ${invItem.name}` : `- Kihagyva: ${invItem.name}`}
+                                      </span>
+                                    );
+                                  })}
+                                  {item.custom_modifications.note && (
+                                    <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>💬 "{item.custom_modifications.note}"</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="cart-item-price-delete">
+                            <span className="cart-item-price">
+                              {((itemPrice + item.packaging_fee_at_order) * item.quantity).toLocaleString()} FT
+                            </span>
+                            <button 
+                              className="cart-item-delete" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeFromCart(item.item_id);
+                              }}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </div>
-                        <div className="cart-item-price-delete">
-                          <span className="cart-item-price">
-                            {((item.price_at_order + item.packaging_fee_at_order) * item.quantity).toLocaleString()} FT
-                          </span>
-                          <button className="cart-item-delete" onClick={() => removeFromCart(item.item_id)}>
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
-
+              
               {/* Cart details and buttons at bottom */}
               <div className="cart-actions">
                 {(() => {
-                  const subtotal = cart.reduce((sum, item) => sum + (item.price_at_order + item.packaging_fee_at_order) * item.quantity, 0);
+                  const subtotal = cart.reduce((sum, item) => {
+                    const price = item.custom_modifications ? item.custom_modifications.calculated_price : item.price_at_order;
+                    return sum + (price + item.packaging_fee_at_order) * item.quantity;
+                  }, 0);
                   const finalCartTotal = Math.max(0, Math.round(subtotal * (1 - discountPercentage / 100)) + deliveryFee);
                   return (
                     <div className="cart-summary" style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '10px', marginBottom: '10px', fontSize: '13px' }}>
@@ -4621,6 +4814,7 @@ export default function App() {
                             setInvItemFreqValue(7);
                             setInvItemFreqUnit('day');
                             setInvItemProcurement(false);
+                            setInvItemDoubleExtraPrice(0);
                             setEditingInvItem({ id: 'NEW', quantity: 0 });
                           }}
                         >
@@ -4768,6 +4962,7 @@ export default function App() {
                                               setInvItemFreqValue(freqVal);
                                               setInvItemFreqUnit(isWeeks ? 'week' : 'day');
                                               setInvItemProcurement(inv.is_under_procurement || false);
+                                              setInvItemDoubleExtraPrice(inv.double_extra_price || 0);
                                               
                                               setEditingInvItem(inv);
                                             }}
@@ -5075,6 +5270,17 @@ export default function App() {
                               </div>
                             </div>
 
+                            <div>
+                              <label className="input-label">Dupla adag extra ára (Ft)</label>
+                              <input 
+                                type="number" 
+                                className="input-field" 
+                                value={invItemDoubleExtraPrice} 
+                                onChange={e => setInvItemDoubleExtraPrice(parseFloat(e.target.value) || 0)} 
+                                placeholder="Pl: 200"
+                              />
+                            </div>
+
                             {/* Purchase Frequency & Procurement Checkbox */}
                             <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.8fr', gap: '12px', alignItems: 'flex-end', borderTop: '1px dashed rgba(255,255,255,0.06)', paddingTop: '10px' }}>
                               <div>
@@ -5167,6 +5373,7 @@ export default function App() {
                                       last_filled_at: new Date().toISOString(),
                                       last_filled_by: currentUser?.name || 'Rendszer',
                                       is_under_procurement: invItemProcurement,
+                                      double_extra_price: invItemDoubleExtraPrice,
                                       is_active: true
                                     };
                                     updated = [...inventory, newItem];
@@ -5187,6 +5394,7 @@ export default function App() {
                                             supplier_id: invItemSupplierId,
                                             purchase_frequency: frequencyStr,
                                             is_under_procurement: invItemProcurement,
+                                            double_extra_price: invItemDoubleExtraPrice,
                                             last_filled_at: isFilled ? new Date().toISOString() : i.last_filled_at,
                                             last_filled_by: isFilled ? (currentUser?.name || 'Rendszer') : i.last_filled_by
                                           }
@@ -5482,18 +5690,18 @@ export default function App() {
 
                     {/* EDIT USER DRAWER / MODAL */}
                     {editingUserItem && (
-                      <div className="modal-backdrop" style={{ zIndex: 10000 }}>
-                        <div className="modal-content" style={{ width: '420px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '10px' }}>
-                            <h3 style={{ margin: 0, color: 'white', fontSize: '16px', fontWeight: 700 }}>
+                      <div className="modal-overlay" style={{ position: 'fixed', zIndex: 10000 }} onClick={() => setEditingUserItem(null)}>
+                        <div className="modal-card" onClick={e => e.stopPropagation()} style={{ width: '440px' }}>
+                          <div className="modal-header" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '12px' }}>
+                            <span className="modal-title">
                               {editingUserItem === 'NEW' ? 'Új Munkatárs Fiók' : 'Munkatárs Fiók Szerkesztése'}
-                            </h3>
-                            <button className="btn-close" onClick={() => setEditingUserItem(null)} style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer' }}>
-                              <X size={16} />
+                            </span>
+                            <button className="island-close-btn" onClick={() => setEditingUserItem(null)}>
+                              <X size={14} />
                             </button>
                           </div>
 
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '70vh', overflowY: 'auto', paddingRight: '4px' }}>
+                          <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto', paddingRight: '4px' }}>
                             <div>
                               <label className="input-label">Munkatárs Teljes Neve</label>
                               <input 
@@ -5621,10 +5829,10 @@ export default function App() {
                                   </label>
                                 );
                               })}
-                            </div>
+                          </div>
                           </div>
 
-                          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '14px', marginTop: '4px' }}>
+                          <div className="modal-footer" style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '14px', marginTop: '4px' }}>
                             {editingUserItem !== 'NEW' && (
                               <button 
                                 className="btn" 
@@ -6775,6 +6983,277 @@ export default function App() {
           </div>
         )}
       </footer>
+
+
+      {/* ================= MODAL: KOSÁR ELEM TESTRESZABÁSA ================= */}
+      {editingCartItem && (() => {
+        const baseMenuItem = db.items.find((i: any) => i.id === editingCartItem.item_id);
+        const basePrice = baseMenuItem ? baseMenuItem.price : editingCartItem.price_at_order;
+        const packFee = editingCartItem.packaging_fee_at_order;
+
+        let extraPrice = 0;
+        Object.keys(editIngredientAdjustments).forEach((key) => {
+          const ingId = Number(key);
+          const adjustment = editIngredientAdjustments[ingId];
+          if (adjustment === 'double') {
+            const invItem = db.inventory.find((i: any) => i.id === ingId);
+            if (invItem) {
+              extraPrice += (invItem.double_extra_price || 0);
+            }
+          }
+        });
+
+        const calculatedSinglePrice = Math.round(basePrice * (editPortion === 'half' ? 0.7 : 1.0)) + extraPrice;
+
+        // Gather allergens from recipe ingredients
+        const allergenNames = new Set<string>();
+        if (baseMenuItem && baseMenuItem.ingredients) {
+          baseMenuItem.ingredients.forEach((ing: any) => {
+            const invItem = db.inventory.find((i: any) => i.id === ing.ingredientId);
+            if (invItem) {
+              const detected = detectAllergens(invItem.name);
+              detected.forEach((a: any) => allergenNames.add(a.name));
+            }
+          });
+        }
+        if (baseMenuItem && baseMenuItem.allergens) {
+          baseMenuItem.allergens.forEach((a: string) => allergenNames.add(a));
+        }
+        const allergensList = Array.from(allergenNames);
+
+        const ingredientsList = baseMenuItem ? baseMenuItem.ingredients || [] : [];
+
+        return (
+          <div className="modal-overlay" style={{ position: 'fixed', zIndex: 10000 }} onClick={() => setEditingCartItem(null)}>
+            <div className="modal-card" style={{ width: '480px' }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <span className="modal-title">{editingCartItem.name} testreszabása</span>
+                <button className="island-close-btn" onClick={() => setEditingCartItem(null)}>
+                  <X size={14} />
+                </button>
+              </div>
+
+              <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto', paddingRight: '4px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                
+                {/* Price and Packaging Info */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', fontSize: '12px' }}>
+                  <div>
+                    <span style={{ color: 'var(--text-secondary)' }}>Alapár: </span>
+                    <strong style={{ color: 'white' }}>{basePrice.toLocaleString()} FT</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-secondary)' }}>Csomagolás: </span>
+                    <strong style={{ color: 'white' }}>{packFee.toLocaleString()} FT</strong>
+                  </div>
+                  {baseMenuItem?.packaging_type && (
+                    <div style={{ textTransform: 'capitalize', color: 'var(--primary)', fontWeight: 600 }}>
+                      📦 {baseMenuItem.packaging_type}
+                    </div>
+                  )}
+                </div>
+
+                {/* Portion Switch */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label className="input-label">Adag mérete</label>
+                  <div className="portion-switch-container">
+                    <div className={`portion-switch-slider ${editPortion}`} />
+                    <button 
+                      className={`portion-switch-btn ${editPortion === 'full' ? 'active' : ''}`}
+                      onClick={() => setEditPortion('full')}
+                    >
+                      Teljes Adag (100% ár)
+                    </button>
+                    <button 
+                      className={`portion-switch-btn ${editPortion === 'half' ? 'active' : ''}`}
+                      onClick={() => setEditPortion('half')}
+                    >
+                      Fél Adag (70% ár)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Ingredients Recipe List */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label className="input-label" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '4px' }}>
+                    Alapanyagok testreszabása
+                  </label>
+                  {ingredientsList.length === 0 ? (
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                      Ennek az ételnek nincsenek külön választható alapanyagai.
+                    </span>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      {ingredientsList.map((ing: any) => {
+                        const invItem = db.inventory.find((i: any) => i.id === ing.ingredientId);
+                        if (!invItem) return null;
+                        const adjustment = editIngredientAdjustments[ing.ingredientId] || 'normal';
+                        const extraPriceVal = invItem.double_extra_price || 0;
+
+                        return (
+                          <div 
+                            key={ing.ingredientId} 
+                            style={{ 
+                              display: 'flex', 
+                              justifyContent: 'space-between', 
+                              alignItems: 'center', 
+                              padding: '8px 0', 
+                              borderBottom: '1px solid rgba(255,255,255,0.03)' 
+                            }}
+                          >
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 500, color: adjustment === 'none' ? 'var(--text-muted)' : 'white', textDecoration: adjustment === 'none' ? 'line-through' : 'none' }}>
+                                {invItem.name}
+                              </span>
+                              {adjustment === 'double' && extraPriceVal > 0 && (
+                                <span style={{ fontSize: '11px', color: 'var(--success)', fontWeight: 600 }}>
+                                  +{extraPriceVal.toLocaleString()} FT (Dupla adag)
+                                </span>
+                              )}
+                              {adjustment === 'none' && (
+                                <span style={{ fontSize: '11px', color: '#ff453a' }}>
+                                  Kihagyva a receptből
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Button selector group */}
+                            <div 
+                              style={{ 
+                                display: 'flex', 
+                                gap: '2px', 
+                                background: 'rgba(255,255,255,0.03)', 
+                                padding: '2px', 
+                                borderRadius: '8px', 
+                                border: '1px solid rgba(255,255,255,0.05)' 
+                              }}
+                            >
+                              <button 
+                                className="btn"
+                                style={{ 
+                                  padding: '4px 10px', 
+                                  fontSize: '11px', 
+                                  borderRadius: '6px', 
+                                  border: 'none',
+                                  background: adjustment === 'none' ? 'rgba(255,69,58,0.15)' : 'transparent',
+                                  color: adjustment === 'none' ? '#ff453a' : 'var(--text-secondary)',
+                                  fontWeight: adjustment === 'none' ? 'bold' : 'normal',
+                                  cursor: 'pointer'
+                                }}
+                                onClick={() => setEditIngredientAdjustments(prev => ({ ...prev, [ing.ingredientId]: 'none' }))}
+                              >
+                                Kihagy
+                              </button>
+                              <button 
+                                className="btn"
+                                style={{ 
+                                  padding: '4px 10px', 
+                                  fontSize: '11px', 
+                                  borderRadius: '6px', 
+                                  border: 'none',
+                                  background: adjustment === 'normal' ? 'rgba(255,255,255,0.08)' : 'transparent',
+                                  color: adjustment === 'normal' ? 'white' : 'var(--text-secondary)',
+                                  fontWeight: adjustment === 'normal' ? 'bold' : 'normal',
+                                  cursor: 'pointer'
+                                }}
+                                onClick={() => setEditIngredientAdjustments(prev => ({ ...prev, [ing.ingredientId]: 'normal' }))}
+                              >
+                                Normál
+                              </button>
+                              <button 
+                                className="btn"
+                                style={{ 
+                                  padding: '4px 10px', 
+                                  fontSize: '11px', 
+                                  borderRadius: '6px', 
+                                  border: 'none',
+                                  background: adjustment === 'double' ? 'rgba(48,209,88,0.15)' : 'transparent',
+                                  color: adjustment === 'double' ? '#30d158' : 'var(--text-secondary)',
+                                  fontWeight: adjustment === 'double' ? 'bold' : 'normal',
+                                  cursor: 'pointer'
+                                }}
+                                onClick={() => setEditIngredientAdjustments(prev => ({ ...prev, [ing.ingredientId]: 'double' }))}
+                              >
+                                Dupla
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Note Area */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label className="input-label">Egyedi konyhai megjegyzés</label>
+                  <textarea 
+                    className="input-field"
+                    style={{ height: '60px', padding: '8px', fontSize: '12px', resize: 'vertical' }}
+                    value={editNote}
+                    onChange={e => setEditNote(e.target.value)}
+                    placeholder="pl: Kevésbé átsütve, szósz a szélére is, tejföllel leöntve..."
+                  />
+                </div>
+
+                {/* Allergens warning */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <label className="input-label">Étel allergének</label>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {allergensList.length === 0 ? (
+                      <span style={{ fontSize: '11px', color: 'var(--success)', fontStyle: 'italic' }}>
+                        ✅ Nem tartalmaz ismert allergént.
+                      </span>
+                    ) : (
+                      allergensList.map(allergen => (
+                        <span 
+                          key={allergen} 
+                          style={{ 
+                            background: 'rgba(255,69,58,0.1)', 
+                            border: '1px solid rgba(255,69,58,0.2)', 
+                            color: '#ff453a', 
+                            fontSize: '10px', 
+                            padding: '2px 8px', 
+                            borderRadius: '4px', 
+                            fontWeight: 600 
+                          }}
+                        >
+                          ⚠️ {allergen}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Dynamic Price Summary */}
+                <div style={{ marginTop: '10px', padding: '12px', background: 'rgba(10, 132, 255, 0.05)', border: '1px solid rgba(10, 132, 255, 0.15)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                      Egységár: {calculatedSinglePrice.toLocaleString()} FT (+csomagolás)
+                    </span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                      Mennyiség: {editingCartItem.quantity} db
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Összesen</span>
+                    <strong style={{ fontSize: '16px', color: 'var(--primary)' }}>
+                      {((calculatedSinglePrice + packFee) * editingCartItem.quantity).toLocaleString()} FT
+                    </strong>
+                  </div>
+                </div>
+
+              </div>
+
+              <div className="modal-footer" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px' }}>
+                <button className="btn" onClick={() => setEditingCartItem(null)}>Mégse</button>
+                <button className="btn btn-primary" onClick={handleSaveCartItemCustomizations}>
+                  Módosítások Alkalmazása
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
 
       {/* ================= MODAL: KEDVEZMÉNY ================= */}
