@@ -6,7 +6,7 @@ import {
   FileText, ChevronLeft, Percent, CreditCard, Wallet, 
   ShoppingCart, ShoppingBag, AlertTriangle, Banknote, Gift, Clock, Scissors,
   Eye, EyeOff, SlidersHorizontal, Activity, Check, ChevronDown, Phone,
-  Flame, Coffee, Bell, ChefHat, Utensils
+  Flame, Coffee, Bell, ChefHat, Utensils, CheckCircle2
 } from 'lucide-react';
 import { 
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, 
@@ -707,12 +707,10 @@ export default function App() {
   const [editNote, setEditNote] = useState('');
   const [editQuantity, setEditQuantity] = useState<number>(1);
   const [editLinkedItem, setEditLinkedItem] = useState<MenuItem | null>(null);
-  const [openEditLinkedItemDropdown, setOpenEditLinkedItemDropdown] = useState(false);
 
   // Attachment Selector States for Main Menu click
   const [attachingMenuItem, setAttachingMenuItem] = useState<MenuItem | null>(null);
   const [selectedAttachmentItem, setSelectedAttachmentItem] = useState<MenuItem | null>(null);
-  const [openAttachmentDropdown, setOpenAttachmentDropdown] = useState(false);
 
   // Scheduler States
   const [scheduleYear, setScheduleYear] = useState<number>(new Date().getFullYear());
@@ -1507,7 +1505,6 @@ export default function App() {
     if (category && category.linked_category_id !== undefined && category.linked_category_id !== null) {
       setAttachingMenuItem(item);
       setSelectedAttachmentItem(null); // default to none
-      setOpenAttachmentDropdown(false);
       return;
     }
     addToCartImmediately(item, null);
@@ -1541,7 +1538,6 @@ export default function App() {
       }
       setEditIngredientAdjustments(initialAdjustments);
     }
-    setOpenEditLinkedItemDropdown(false);
   };
 
   // Helper to save customizations of cart item
@@ -7137,7 +7133,7 @@ export default function App() {
 
         return (
           <div className="modal-overlay" style={{ position: 'fixed', zIndex: 10000 }} onClick={() => setEditingCartItem(null)}>
-            <div className="modal-card" style={{ width: '480px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-card" style={{ width: baseMenuItem?.category_id && db.categories.find((c: any) => c.id === baseMenuItem.category_id)?.linked_category_id ? '650px' : '480px' }} onClick={e => e.stopPropagation()}>
               <div className="modal-header">
                 <span className="modal-title">{editingCartItem.name} testreszabása</span>
                 <button className="island-close-btn" onClick={() => setEditingCartItem(null)}>
@@ -7345,30 +7341,78 @@ export default function App() {
                   const attachmentOptions = db.items.filter((i: any) => i.category_id === linkedCat.id && i.is_active !== false);
 
                   return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label className="input-label">Csatolmány ({linkedCat.name})</label>
-                      <AppleSelect
-                        value={editLinkedItem ? editLinkedItem.id : 'none'}
-                        onChange={val => {
-                          if (val === 'none') {
-                            setEditLinkedItem(null);
-                          } else {
-                            const found = db.items.find((i: any) => i.id === Number(val));
-                            setEditLinkedItem(found || null);
-                          }
-                        }}
-                        options={[
-                          { value: 'none', label: 'Csatolmány nélkül' },
-                          ...attachmentOptions.map((i: any) => ({
-                            value: i.id,
-                            label: `${i.name} (+${i.price.toLocaleString()} FT)`
-                          }))
-                        ]}
-                        icon={<Layers size={12} />}
-                        isOpen={openEditLinkedItemDropdown}
-                        onToggle={() => setOpenEditLinkedItemDropdown(!openEditLinkedItemDropdown)}
-                        onClose={() => setOpenEditLinkedItemDropdown(false)}
-                      />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label className="input-label">Csatolmány választása ({linkedCat.name})</label>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))',
+                        gap: '10px',
+                        marginTop: '4px',
+                        maxHeight: '260px',
+                        overflowY: 'auto',
+                        padding: '2px'
+                      }}>
+                        {/* Csatolmány nélkül Card */}
+                        <div 
+                          style={{
+                            background: !editLinkedItem ? 'rgba(10, 132, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                            border: !editLinkedItem ? '2px solid var(--primary)' : '1px solid var(--glass-border)',
+                            borderRadius: '10px',
+                            padding: '12px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            minHeight: '90px',
+                            transition: 'all 0.2s ease',
+                            boxShadow: !editLinkedItem ? '0 0 8px rgba(10, 132, 255, 0.15)' : 'none'
+                          }}
+                          onClick={() => setEditLinkedItem(null)}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: '#ff453a' }}>Csatolmány nélkül</span>
+                            {!editLinkedItem && <CheckCircle2 size={14} color="var(--primary)" />}
+                          </div>
+                          <div style={{ marginTop: '8px' }}>
+                            <span style={{ fontSize: '14px', fontWeight: 800, color: 'var(--text-muted)' }}>0 FT</span>
+                          </div>
+                        </div>
+
+                        {/* Linked Items Cards */}
+                        {attachmentOptions.map((attItem: MenuItem) => {
+                          const isSelected = editLinkedItem?.id === attItem.id;
+                          return (
+                            <div
+                              key={attItem.id}
+                              style={{
+                                background: isSelected ? 'rgba(10, 132, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                                border: isSelected ? '2px solid var(--primary)' : '1px solid var(--glass-border)',
+                                borderRadius: '10px',
+                                padding: '12px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                                minHeight: '90px',
+                                transition: 'all 0.2s ease',
+                                boxShadow: isSelected ? '0 0 8px rgba(10, 132, 255, 0.15)' : 'none'
+                              }}
+                              onClick={() => setEditLinkedItem(attItem)}
+                            >
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '4px' }}>
+                                <span style={{ fontSize: '12px', fontWeight: 700, color: 'white', wordBreak: 'break-word' }}>{attItem.name}</span>
+                                {isSelected && <CheckCircle2 size={14} color="var(--primary)" />}
+                              </div>
+                              <div style={{ marginTop: '8px' }}>
+                                <span style={{ fontSize: '14px', fontWeight: 800, color: 'white' }}>{attItem.price.toLocaleString()} FT</span>
+                                <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                  Csomagolás: {attItem.packaging_fee > 0 ? `${attItem.packaging_fee} FT` : 'ingyenes'}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   );
                 })()}
@@ -7480,7 +7524,7 @@ export default function App() {
 
         return (
           <div className="modal-overlay" onClick={() => setAttachingMenuItem(null)}>
-            <div className="modal-card" style={{ maxWidth: '480px', background: 'var(--panel-bg)', border: '1px solid var(--glass-border)', padding: '20px', display: 'block' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-card" style={{ maxWidth: '750px', background: 'var(--panel-bg)', border: '1px solid var(--glass-border)', padding: '20px', display: 'block' }} onClick={e => e.stopPropagation()}>
               <div className="modal-header" style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                 <span className="modal-title" style={{ fontSize: '15px', fontWeight: 700 }}>
                   Csatolmány kiválasztása: {attachingMenuItem.name}
@@ -7492,33 +7536,81 @@ export default function App() {
 
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                  A(z) <strong>{itemCategory?.name}</strong> kategóriához csatolva van a(z) <strong>{linkedCategory.name}</strong> kategória. Kérlek válassz egy csatolmányt vagy kattints a "Csatolmány nélkül" gombra.
+                  A(z) <strong>{itemCategory?.name}</strong> kategóriához csatolva van a(z) <strong>{linkedCategory.name}</strong> kategória. Kérlek válassz egy csatolmányt a lenti kártyák közül, vagy kattints a "Csatolmány nélkül" gombra.
                 </span>
 
                 <div>
-                  <label className="input-label">{linkedCategory.name} kiválasztása</label>
-                  <AppleSelect
-                    value={selectedAttachmentItem ? selectedAttachmentItem.id : 'none'}
-                    onChange={val => {
-                      if (val === 'none') {
-                        setSelectedAttachmentItem(null);
-                      } else {
-                        const attItem = db.items.find((i: any) => i.id === Number(val));
-                        setSelectedAttachmentItem(attItem || null);
-                      }
-                    }}
-                    options={[
-                      { value: 'none', label: 'Csatolmány nélkül (0 FT)' },
-                      ...attachmentItems.map((i: any) => ({
-                        value: i.id,
-                        label: `${i.name} (+${i.price.toLocaleString()} FT)`
-                      }))
-                    ]}
-                    icon={<Layers size={12} />}
-                    isOpen={openAttachmentDropdown}
-                    onToggle={() => setOpenAttachmentDropdown(!openAttachmentDropdown)}
-                    onClose={() => setOpenAttachmentDropdown(false)}
-                  />
+                  <label className="input-label" style={{ marginBottom: '8px', display: 'block' }}>{linkedCategory.name} kiválasztása</label>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                    gap: '12px',
+                    marginTop: '4px',
+                    maxHeight: '300px',
+                    overflowY: 'auto',
+                    padding: '2px'
+                  }}>
+                    {/* Csatolmány nélkül Card */}
+                    <div 
+                      style={{
+                        background: !selectedAttachmentItem ? 'rgba(10, 132, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                        border: !selectedAttachmentItem ? '2px solid var(--primary)' : '1px solid var(--glass-border)',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        minHeight: '100px',
+                        transition: 'all 0.2s ease',
+                        boxShadow: !selectedAttachmentItem ? '0 0 10px rgba(10, 132, 255, 0.15)' : 'none'
+                      }}
+                      onClick={() => setSelectedAttachmentItem(null)}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#ff453a' }}>Csatolmány nélkül</span>
+                        {!selectedAttachmentItem && <CheckCircle2 size={16} color="var(--primary)" />}
+                      </div>
+                      <div style={{ marginTop: '12px' }}>
+                        <span style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text-muted)' }}>0 FT</span>
+                      </div>
+                    </div>
+
+                    {/* Linked Items Cards */}
+                    {attachmentItems.map((attItem: MenuItem) => {
+                      const isSelected = selectedAttachmentItem?.id === attItem.id;
+                      return (
+                        <div
+                          key={attItem.id}
+                          style={{
+                            background: isSelected ? 'rgba(10, 132, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                            border: isSelected ? '2px solid var(--primary)' : '1px solid var(--glass-border)',
+                            borderRadius: '12px',
+                            padding: '16px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            minHeight: '100px',
+                            transition: 'all 0.2s ease',
+                            boxShadow: isSelected ? '0 0 10px rgba(10, 132, 255, 0.15)' : 'none'
+                          }}
+                          onClick={() => setSelectedAttachmentItem(attItem)}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: 'white', wordBreak: 'break-word' }}>{attItem.name}</span>
+                            {isSelected && <CheckCircle2 size={16} color="var(--primary)" />}
+                          </div>
+                          <div style={{ marginTop: '12px' }}>
+                            <span style={{ fontSize: '16px', fontWeight: 800, color: 'white' }}>{attItem.price.toLocaleString()} FT</span>
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                              Csomagolás: {attItem.packaging_fee > 0 ? `${attItem.packaging_fee} FT` : 'ingyenes'}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Display Single Item and total price summary */}
