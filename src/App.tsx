@@ -150,7 +150,7 @@ const renderUserIcon = (symbol: string, size = 16, color = 'white') => {
 
 const renderKitchenItemModifications = (item: OrderItem, inventory: any[]) => {
   if (!item.custom_modifications) return null;
-  const { portion, ingredient_adjustments, note } = item.custom_modifications;
+  const { portion, ingredient_adjustments, note, linked_item } = item.custom_modifications;
 
   const doubleIngs: string[] = [];
   const removedIngs: string[] = [];
@@ -166,7 +166,7 @@ const renderKitchenItemModifications = (item: OrderItem, inventory: any[]) => {
     }
   });
 
-  if (portion !== 'half' && doubleIngs.length === 0 && removedIngs.length === 0 && !note) {
+  if (portion !== 'half' && doubleIngs.length === 0 && removedIngs.length === 0 && !note && !linked_item) {
     return null;
   }
 
@@ -195,6 +195,11 @@ const renderKitchenItemModifications = (item: OrderItem, inventory: any[]) => {
       {removedIngs.length > 0 && (
         <span style={{ color: '#ff453a', fontWeight: 600, fontSize: '10px', textDecoration: 'line-through' }}>
           ❌ NÉLKÜL: {removedIngs.join(', ')}
+        </span>
+      )}
+      {linked_item && (
+        <span style={{ color: '#0a84ff', fontWeight: 'bold', fontSize: '10px' }}>
+          ➕ CSATOLMÁNY: {linked_item.name}
         </span>
       )}
       {note && (
@@ -695,6 +700,13 @@ export default function App() {
   const [editIngredientAdjustments, setEditIngredientAdjustments] = useState<{ [ingredientId: number]: 'none' | 'normal' | 'double' }>({});
   const [editNote, setEditNote] = useState('');
   const [editQuantity, setEditQuantity] = useState<number>(1);
+  const [editLinkedItem, setEditLinkedItem] = useState<MenuItem | null>(null);
+  const [openEditLinkedItemDropdown, setOpenEditLinkedItemDropdown] = useState(false);
+
+  // Attachment Selector States for Main Menu click
+  const [attachingMenuItem, setAttachingMenuItem] = useState<MenuItem | null>(null);
+  const [selectedAttachmentItem, setSelectedAttachmentItem] = useState<MenuItem | null>(null);
+  const [openAttachmentDropdown, setOpenAttachmentDropdown] = useState(false);
 
   // Scheduler States
   const [scheduleYear, setScheduleYear] = useState<number>(new Date().getFullYear());
@@ -1428,21 +1440,69 @@ export default function App() {
     setIsPaymentViewActive(false);
   };
 
-  // Add Item to Cart
-  const addToCart = (item: MenuItem) => {
+  // Add Item to Cart Immediately (with optional attachment)
+  const addToCartImmediately = (item: MenuItem, attachment: MenuItem | null) => {
     setCart(prev => {
-      const existing = prev.find(i => i.item_id === item.id);
+      const existing = prev.find(i => 
+        i.item_id === item.id && 
+        ((!i.custom_modifications?.linked_item && !attachment) || 
+         (i.custom_modifications?.linked_item?.item_id === attachment?.id))
+      );
+      
+      const linkedItemVal = attachment ? {
+        item_id: attachment.id,
+        name: attachment.name,
+        price_at_order: attachment.price
+      } : null;
+
       if (existing) {
-        return prev.map(i => i.item_id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
+        return prev.map(i => 
+          (i.item_id === item.id && 
+           ((!i.custom_modifications?.linked_item && !attachment) || 
+            (i.custom_modifications?.linked_item?.item_id === attachment?.id)))
+          ? { ...i, quantity: i.quantity + 1 } 
+          : i
+        );
       }
+
+      // Initialize with default ingredients for this item from MenuItem
+      const initialAdjustments: { [key: number]: 'none' | 'normal' | 'double' } = {};
+      if (item.ingredients) {
+        item.ingredients.forEach((ing: any) => {
+          initialAdjustments[ing.ingredientId] = 'normal';
+        });
+      }
+
+      const calculated_single_price = item.price + (attachment ? attachment.price : 0);
+
       return [...prev, {
         item_id: item.id,
         name: item.name,
         quantity: 1,
         price_at_order: item.price,
-        packaging_fee_at_order: item.packaging_fee
+        packaging_fee_at_order: item.packaging_fee,
+        custom_modifications: {
+          portion: 'full',
+          ingredient_adjustments: initialAdjustments,
+          note: '',
+          extra_price: 0,
+          calculated_price: calculated_single_price,
+          linked_item: linkedItemVal
+        }
       }];
     });
+  };
+
+  // Add Item to Cart (checks for linked category)
+  const addToCart = (item: MenuItem) => {
+    const category = db.categories.find((c: any) => c.id === item.category_id);
+    if (category && category.linked_category_id !== undefined && category.linked_category_id !== null) {
+      setAttachingMenuItem(item);
+      setSelectedAttachmentItem(null); // default to none
+      setOpenAttachmentDropdown(false);
+      return;
+    }
+    addToCartImmediately(item, null);
   };
 
   // Helper to open cart item customization modal
@@ -1453,9 +1513,15 @@ export default function App() {
       setEditPortion(item.custom_modifications.portion);
       setEditIngredientAdjustments({ ...item.custom_modifications.ingredient_adjustments });
       setEditNote(item.custom_modifications.note);
+      
+      const attachedItem = item.custom_modifications.linked_item 
+        ? db.items.find((i: any) => i.id === item.custom_modifications?.linked_item?.item_id) 
+        : null;
+      setEditLinkedItem(attachedItem || null);
     } else {
       setEditPortion('full');
       setEditNote('');
+      setEditLinkedItem(null);
       
       // Initialize with default ingredients for this item from MenuItem
       const menuItem = db.items.find((i: any) => i.id === item.item_id);
@@ -1467,6 +1533,7 @@ export default function App() {
       }
       setEditIngredientAdjustments(initialAdjustments);
     }
+    setOpenEditLinkedItemDropdown(false);
   };
 
   // Helper to save customizations of cart item
@@ -1488,10 +1555,17 @@ export default function App() {
       }
     });
 
-    const calculated_single_price = Math.round(basePrice * (editPortion === 'half' ? 0.7 : 1.0)) + extra_price;
+    const attachmentPrice = editLinkedItem ? editLinkedItem.price : 0;
+    const calculated_single_price = Math.round(basePrice * (editPortion === 'half' ? 0.7 : 1.0)) + extra_price + attachmentPrice;
+
+    const linkedItemVal = editLinkedItem ? {
+      item_id: editLinkedItem.id,
+      name: editLinkedItem.name,
+      price_at_order: editLinkedItem.price
+    } : null;
 
     setCart(prev => prev.map(item => {
-      if (item.item_id === editingCartItem.item_id) {
+      if (item === editingCartItem) {
         return {
           ...item,
           quantity: editQuantity,
@@ -1500,7 +1574,8 @@ export default function App() {
             ingredient_adjustments: editIngredientAdjustments,
             note: editNote,
             extra_price: extra_price,
-            calculated_price: calculated_single_price
+            calculated_price: calculated_single_price,
+            linked_item: linkedItemVal
           }
         };
       }
@@ -3345,6 +3420,11 @@ export default function App() {
                                   {item.custom_modifications.note && (
                                     <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>💬 "{item.custom_modifications.note}"</span>
                                   )}
+                                  {item.custom_modifications.linked_item && (
+                                    <span style={{ color: '#0a84ff', fontWeight: 600 }}>
+                                      ➕ Csatolmány: {item.custom_modifications.linked_item.name} (+{item.custom_modifications.linked_item.price_at_order.toLocaleString()} FT)
+                                    </span>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -4100,6 +4180,24 @@ export default function App() {
                             />
                           </div>
 
+                          <div>
+                            <label className="input-label">Csatolt Kategória (opcionális)</label>
+                            <AppleSelect
+                              value={newCatLinkedCategoryId}
+                              onChange={val => setNewCatLinkedCategoryId(val === 'none' ? 'none' : Number(val))}
+                              options={[
+                                { value: 'none', label: 'Nincs csatolt kategória' },
+                                ...db.categories
+                                  .filter((c: any) => c.id !== editingCategory.id)
+                                  .map((c: any) => ({ value: c.id, label: c.name }))
+                              ]}
+                              icon={<Layers size={12} />}
+                              isOpen={openCatLinkDropdown}
+                              onToggle={() => setOpenCatLinkDropdown(!openCatLinkDropdown)}
+                              onClose={() => setOpenCatLinkDropdown(false)}
+                            />
+                          </div>
+
                           <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>
                             <button className="btn" onClick={() => setEditingCategory(null)}>Mégse</button>
                             <button 
@@ -4116,13 +4214,15 @@ export default function App() {
                                     id: newId,
                                     name: nameTrimmed,
                                     description: newCatDescription.trim(),
-                                    is_active: true
+                                    is_active: true,
+                                    linked_category_id: newCatLinkedCategoryId === 'none' ? null : newCatLinkedCategoryId
                                   });
                                 } else {
                                   updated = db.categories.map((c: any) => c.id === editingCategory.id ? {
                                     ...c,
                                     name: nameTrimmed,
-                                    description: newCatDescription.trim()
+                                    description: newCatDescription.trim(),
+                                    linked_category_id: newCatLinkedCategoryId === 'none' ? null : newCatLinkedCategoryId
                                   } : c);
                                 }
 
@@ -7006,7 +7106,8 @@ export default function App() {
           }
         });
 
-        const calculatedSinglePrice = Math.round(basePrice * (editPortion === 'half' ? 0.7 : 1.0)) + extraPrice;
+        const attachmentPrice = editLinkedItem ? editLinkedItem.price : 0;
+        const calculatedSinglePrice = Math.round(basePrice * (editPortion === 'half' ? 0.7 : 1.0)) + extraPrice + attachmentPrice;
 
         // Gather allergens from recipe ingredients
         const allergenNames = new Set<string>();
@@ -7227,6 +7328,43 @@ export default function App() {
                   </div>
                 </div>
 
+                {/* Linked Category Attachment Selector */}
+                {(() => {
+                  const itemCat = db.categories.find((c: any) => c.id === baseMenuItem?.category_id);
+                  const linkedCat = itemCat ? db.categories.find((c: any) => c.id === itemCat.linked_category_id) : null;
+                  if (!linkedCat) return null;
+
+                  const attachmentOptions = db.items.filter((i: any) => i.category_id === linkedCat.id && i.is_active !== false);
+
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label className="input-label">Csatolmány ({linkedCat.name})</label>
+                      <AppleSelect
+                        value={editLinkedItem ? editLinkedItem.id : 'none'}
+                        onChange={val => {
+                          if (val === 'none') {
+                            setEditLinkedItem(null);
+                          } else {
+                            const found = db.items.find((i: any) => i.id === Number(val));
+                            setEditLinkedItem(found || null);
+                          }
+                        }}
+                        options={[
+                          { value: 'none', label: 'Csatolmány nélkül' },
+                          ...attachmentOptions.map((i: any) => ({
+                            value: i.id,
+                            label: `${i.name} (+${i.price.toLocaleString()} FT)`
+                          }))
+                        ]}
+                        icon={<Layers size={12} />}
+                        isOpen={openEditLinkedItemDropdown}
+                        onToggle={() => setOpenEditLinkedItemDropdown(!openEditLinkedItemDropdown)}
+                        onClose={() => setOpenEditLinkedItemDropdown(false)}
+                      />
+                    </div>
+                  );
+                })()}
+
                 {/* Quantity Editor */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   <label className="input-label">Rendelési mennyiség</label>
@@ -7316,6 +7454,94 @@ export default function App() {
                 <button className="btn" onClick={() => setEditingCartItem(null)}>Mégse</button>
                 <button className="btn btn-primary" onClick={handleSaveCartItemCustomizations}>
                   Módosítások Alkalmazása
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+
+      {/* ================= MODAL: CSATOLT KATEGÓRIA ELEMEK CSATOLÁSA ================= */}
+      {attachingMenuItem && (() => {
+        const itemCategory = db.categories.find((c: any) => c.id === attachingMenuItem.category_id);
+        const linkedCategory = itemCategory ? db.categories.find((c: any) => c.id === itemCategory.linked_category_id) : null;
+        if (!linkedCategory) return null;
+
+        const attachmentItems = db.items.filter((i: any) => i.category_id === linkedCategory.id && i.is_active !== false);
+
+        return (
+          <div className="modal-overlay" onClick={() => setAttachingMenuItem(null)}>
+            <div className="modal-card" style={{ maxWidth: '480px', background: 'var(--panel-bg)', border: '1px solid var(--glass-border)', padding: '20px', display: 'block' }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header" style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <span className="modal-title" style={{ fontSize: '15px', fontWeight: 700 }}>
+                  Csatolmány kiválasztása: {attachingMenuItem.name}
+                </span>
+                <button className="island-close-btn" style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }} onClick={() => setAttachingMenuItem(null)}>
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  A(z) <strong>{itemCategory?.name}</strong> kategóriához csatolva van a(z) <strong>{linkedCategory.name}</strong> kategória. Kérlek válassz egy csatolmányt vagy kattints a "Csatolmány nélkül" gombra.
+                </span>
+
+                <div>
+                  <label className="input-label">{linkedCategory.name} kiválasztása</label>
+                  <AppleSelect
+                    value={selectedAttachmentItem ? selectedAttachmentItem.id : 'none'}
+                    onChange={val => {
+                      if (val === 'none') {
+                        setSelectedAttachmentItem(null);
+                      } else {
+                        const attItem = db.items.find((i: any) => i.id === Number(val));
+                        setSelectedAttachmentItem(attItem || null);
+                      }
+                    }}
+                    options={[
+                      { value: 'none', label: 'Csatolmány nélkül (0 FT)' },
+                      ...attachmentItems.map((i: any) => ({
+                        value: i.id,
+                        label: `${i.name} (+${i.price.toLocaleString()} FT)`
+                      }))
+                    ]}
+                    icon={<Layers size={12} />}
+                    isOpen={openAttachmentDropdown}
+                    onToggle={() => setOpenAttachmentDropdown(!openAttachmentDropdown)}
+                    onClose={() => setOpenAttachmentDropdown(false)}
+                  />
+                </div>
+
+                {/* Display Single Item and total price summary */}
+                <div style={{ marginTop: '6px', padding: '12px', background: 'rgba(10, 132, 255, 0.05)', border: '1px solid rgba(10, 132, 255, 0.15)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                      Alapár: {attachingMenuItem.price.toLocaleString()} FT
+                    </span>
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                      Csatolmány: {selectedAttachmentItem ? `+${selectedAttachmentItem.price.toLocaleString()} FT` : 'Nincs (+0 FT)'}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                    <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Fizetendő összeg</span>
+                    <strong style={{ fontSize: '16px', color: 'var(--primary)' }}>
+                      {(attachingMenuItem.price + (selectedAttachmentItem ? selectedAttachmentItem.price : 0)).toLocaleString()} FT
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-footer" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px', marginTop: '14px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button className="btn" onClick={() => setAttachingMenuItem(null)}>Mégse</button>
+                <button 
+                  className="btn btn-primary" 
+                  onClick={() => {
+                    addToCartImmediately(attachingMenuItem, selectedAttachmentItem);
+                    setAttachingMenuItem(null);
+                  }}
+                >
+                  Kosárba rakás
                 </button>
               </div>
             </div>
