@@ -181,38 +181,102 @@ const renderKitchenItemModifications = (item: OrderItem, inventory: any[]) => {
     <div style={{
       display: 'flex',
       flexDirection: 'column',
-      gap: '3px',
-      marginTop: '4px',
-      padding: '6px',
-      background: 'rgba(255,255,255,0.03)',
-      borderLeft: '3px solid #ff9f0a',
-      borderRadius: '4px',
+      gap: '6px',
+      marginTop: '6px',
+      padding: '4px 0',
       textAlign: 'left'
     }}>
-      {portion === 'half' && (
-        <span style={{ color: '#ff9f0a', fontWeight: 'bold', fontSize: '10px' }}>
-          🔸 FÉL ADAG (70%-os méret)
-        </span>
-      )}
-      {doubleIngs.length > 0 && (
-        <span style={{ color: '#30d158', fontWeight: 600, fontSize: '10px' }}>
-          ➕ DUPLA: {doubleIngs.join(', ')}
-        </span>
-      )}
-      {removedIngs.length > 0 && (
-        <span style={{ color: '#ff453a', fontWeight: 600, fontSize: '10px', textDecoration: 'line-through' }}>
-          ❌ NÉLKÜL: {removedIngs.join(', ')}
-        </span>
-      )}
-      {linked_item && (
-        <span style={{ color: '#0a84ff', fontWeight: 'bold', fontSize: '10px' }}>
-          ➕ CSATOLMÁNY: {linked_item.name}
-        </span>
-      )}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+        {portion === 'half' && (
+          <span style={{
+            background: 'rgba(255, 159, 10, 0.15)',
+            border: '1px solid #ff9f0a',
+            color: '#ff9f0a',
+            padding: '3px 8px',
+            borderRadius: '6px',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
+            🔸 FÉL ADAG (70%)
+          </span>
+        )}
+
+        {linked_item && (
+          <span style={{
+            background: 'rgba(10, 132, 255, 0.15)',
+            border: '1px solid #0a84ff',
+            color: '#0a84ff',
+            padding: '3px 8px',
+            borderRadius: '6px',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
+            ➕ CSATOLMÁNY: {linked_item.name}
+          </span>
+        )}
+
+        {doubleIngs.map((name, idx) => (
+          <span key={`double-${idx}`} style={{
+            background: 'rgba(48, 209, 88, 0.15)',
+            border: '1px solid #30d158',
+            color: '#30d158',
+            padding: '3px 8px',
+            borderRadius: '6px',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
+            ➕ DUPLA: {name}
+          </span>
+        ))}
+
+        {removedIngs.map((name, idx) => (
+          <span key={`removed-${idx}`} style={{
+            background: 'rgba(255, 69, 58, 0.15)',
+            border: '1px solid #ff453a',
+            color: '#ff453a',
+            padding: '3px 8px',
+            borderRadius: '6px',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            textDecoration: 'line-through',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
+            ❌ NÉLKÜL: {name}
+          </span>
+        ))}
+      </div>
+
       {note && (
-        <span style={{ color: '#64d2ff', fontStyle: 'italic', fontSize: '10px', background: 'rgba(100,210,255,0.1)', padding: '2px 4px', borderRadius: '3px', marginTop: '2px', wordBreak: 'break-all' }}>
-          💬 Megjegyzés: "{note}"
-        </span>
+        <div style={{
+          background: 'rgba(100, 210, 255, 0.12)',
+          border: '1px solid #64d2ff',
+          color: '#64d2ff',
+          padding: '6px 10px',
+          borderRadius: '8px',
+          fontSize: '11px',
+          fontWeight: 600,
+          width: '100%',
+          marginTop: '4px',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: '6px',
+          wordBreak: 'break-word',
+          boxShadow: '0 2px 6px rgba(100, 210, 255, 0.05)'
+        }}>
+          <span style={{ fontSize: '12px' }}>💬</span>
+          <span style={{ flex: 1 }}>Megjegyzés: <strong>"{note}"</strong></span>
+        </div>
       )}
     </div>
   );
@@ -2295,10 +2359,18 @@ export default function App() {
                   return (
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'white' }}>Aktív konyhai rendelések ({preparingOrders.length})</span>
+                        <span style={{ fontSize: '14px', fontWeight: 700, color: 'white' }}>Aktív konyhai rendelések ({preparingOrders.length})</span>
                       </div>
 
-                      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '4px' }}>
+                      <div style={{
+                        flex: 1,
+                        overflowY: 'auto',
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
+                        gap: '16px',
+                        padding: '4px',
+                        alignContent: 'start'
+                      }}>
                         {preparingOrders.map((order: Order) => {
                           const remaining = getRemainingTime(order) ?? 0;
                           const isPreparing = order.preparation_status === 'preparing';
@@ -2312,46 +2384,103 @@ export default function App() {
                                 setPortalCookCourierId(order.assigned_courier_id || null);
                               }}
                               style={{
-                                background: 'rgba(255,255,255,0.03)',
-                                border: isPreparing ? '1px solid rgba(255,159,10,0.3)' : '1px solid var(--glass-border)',
-                                borderRadius: '8px',
-                                padding: '12px',
+                                background: 'rgba(255, 255, 255, 0.03)',
+                                border: isPreparing ? '2px solid #ff9f0a' : '2px solid rgba(255, 255, 255, 0.06)',
+                                borderRadius: '12px',
+                                padding: '16px',
                                 cursor: 'pointer',
                                 transition: 'all 0.2s ease',
-                                position: 'relative'
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '12px',
+                                position: 'relative',
+                                boxShadow: isPreparing ? '0 4px 15px rgba(255,159,10,0.1)' : '0 4px 12px rgba(0,0,0,0.2)'
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.transform = 'none';
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
                               }}
                             >
-                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                                <span style={{ fontWeight: 700, color: 'white', fontSize: '12px' }}>Rendelés #{order.id}</span>
-                                <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{order.created_at.split('T')[1].substring(0, 5)}</span>
-                              </div>
-                              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                                📍 {order.customer_name} - {order.customer_address}
-                              </div>
-                              <div style={{ fontSize: '11px', color: 'white', borderTop: '1px dashed rgba(255,255,255,0.06)', paddingTop: '6px', marginBottom: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                {order.items.map((i: OrderItem, idx: number) => (
-                                  <div key={idx} style={{ display: 'flex', flexDirection: 'column' }}>
-                                    <span style={{ fontWeight: 600 }}>{i.quantity}x {i.name}</span>
-                                    {renderKitchenItemModifications(i, db.inventory)}
-                                  </div>
-                                ))}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontWeight: 850, color: 'white', fontSize: '15px' }}>Rendelés #{order.id}</span>
+                                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{order.created_at.split('T')[1].substring(0, 5)}</span>
                               </div>
                               
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', color: 'white', fontWeight: 600 }}>
+                                  <span>👤</span>
+                                  <span>{order.customer_name}</span>
+                                </div>
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                  <span>📍</span>
+                                  <span style={{ wordBreak: 'break-word' }}>{order.customer_address}</span>
+                                </div>
+                              </div>
+
+                              <div style={{
+                                borderTop: '1px solid rgba(255,255,255,0.06)',
+                                paddingTop: '10px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8px'
+                              }}>
+                                {order.items.map((i: OrderItem, idx: number) => {
+                                  const hasModifications = i.custom_modifications && (
+                                    i.custom_modifications.portion === 'half' ||
+                                    i.custom_modifications.linked_item ||
+                                    i.custom_modifications.note ||
+                                    Object.values(i.custom_modifications.ingredient_adjustments || {}).some(adj => adj === 'double' || adj === 'none')
+                                  );
+
+                                  return (
+                                    <div 
+                                      key={idx} 
+                                      style={{ 
+                                        display: 'flex', 
+                                        flexDirection: 'column',
+                                        background: hasModifications ? 'rgba(255, 255, 255, 0.02)' : 'transparent',
+                                        border: hasModifications ? '1px solid rgba(255, 255, 255, 0.05)' : '1px solid transparent',
+                                        borderRadius: '8px',
+                                        padding: hasModifications ? '10px' : '4px 6px'
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span style={{ fontWeight: 700, fontSize: '14px', color: 'white' }}>{i.quantity}x {i.name}</span>
+                                        {hasModifications && (
+                                          <span style={{ fontSize: '9px', background: 'rgba(191,90,242,0.2)', border: '1px solid #bf5af2', color: '#bf5af2', padding: '1px 5px', borderRadius: '4px', fontWeight: 'bold' }}>
+                                            MÓDOSÍTOTT
+                                          </span>
+                                        )}
+                                      </div>
+                                      {renderKitchenItemModifications(i, db.inventory)}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '10px', marginTop: 'auto' }}>
                                 {isPreparing ? (
                                   <span style={{
-                                    fontSize: '10px',
+                                    fontSize: '11px',
                                     color: remaining === 0 ? '#ff453a' : '#ff9f0a',
-                                    fontWeight: 700,
-                                    background: remaining === 0 ? 'rgba(255,69,58,0.1)' : 'rgba(255,159,10,0.1)',
-                                    padding: '2px 6px',
-                                    borderRadius: '4px'
+                                    fontWeight: 800,
+                                    background: remaining === 0 ? 'rgba(255,69,58,0.15)' : 'rgba(255,159,10,0.15)',
+                                    border: remaining === 0 ? '1px solid rgba(255,69,58,0.3)' : '1px solid rgba(255,159,10,0.3)',
+                                    padding: '4px 8px',
+                                    borderRadius: '6px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
                                   }}>
                                     ⏳ {remaining === 0 ? 'LEJÁRT' : `${Math.floor(remaining / 60)}:${String(remaining % 60).padStart(2, '0')} hátra`}
                                   </span>
                                 ) : (
-                                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                                    Előkészítésre vár
+                                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.03)', padding: '4px 8px', borderRadius: '6px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                    🍳 Előkészítésre vár
                                   </span>
                                 )}
 
@@ -2359,21 +2488,21 @@ export default function App() {
                                   const courier = db.users.find((u: any) => u.id === order.assigned_courier_id);
                                   return courier ? (
                                     <span style={{
-                                      fontSize: '10px',
+                                      fontSize: '11px',
                                       color: 'white',
                                       background: courier.color || 'var(--primary)',
-                                      padding: '2px 6px',
-                                      borderRadius: '4px',
-                                      fontWeight: 600,
-                                      display: 'flex',
+                                      padding: '4px 8px',
+                                      borderRadius: '6px',
+                                      fontWeight: 700,
+                                      display: 'inline-flex',
                                       alignItems: 'center',
                                       gap: '4px'
                                     }}>
-                                      {renderUserIcon(courier.symbol || 'User', 10, 'white')} {courier.name}
+                                      {renderUserIcon(courier.symbol || 'User', 12, 'white')} {courier.name}
                                     </span>
                                   ) : null;
                                 })() : (
-                                  <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Nincs futár kijelölve</span>
+                                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.03)', padding: '4px 8px', borderRadius: '6px', fontWeight: 600 }}>Nincs futár</span>
                                 )}
                               </div>
                             </div>
@@ -2599,25 +2728,46 @@ export default function App() {
                  <div style={{
                    background: 'rgba(255,255,255,0.02)',
                    border: '1px solid rgba(255,255,255,0.04)',
-                   borderRadius: '6px',
-                   padding: '10px',
-                   maxHeight: '180px',
+                   borderRadius: '8px',
+                   padding: '8px',
+                   maxHeight: '260px',
                    overflowY: 'auto',
-                   fontSize: '11px',
-                   color: 'white',
                    display: 'flex',
                    flexDirection: 'column',
-                   gap: '6px'
+                   gap: '8px'
                  }}>
-                   {order.items.map((i: OrderItem, idx: number) => (
-                     <div key={idx} style={{ borderBottom: idx < order.items.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', paddingBottom: '4px', display: 'flex', flexDirection: 'column' }}>
-                       <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
-                         <span style={{ fontWeight: 600 }}>{i.name}</span>
-                         <span>{i.quantity} db</span>
+                   {order.items.map((i: OrderItem, idx: number) => {
+                     const hasModifications = i.custom_modifications && (
+                       i.custom_modifications.portion === 'half' ||
+                       i.custom_modifications.linked_item ||
+                       i.custom_modifications.note ||
+                       Object.values(i.custom_modifications.ingredient_adjustments || {}).some(adj => adj === 'double' || adj === 'none')
+                     );
+
+                     return (
+                       <div 
+                         key={idx} 
+                         style={{ 
+                           display: 'flex', 
+                           flexDirection: 'column',
+                           background: hasModifications ? 'rgba(255, 255, 255, 0.02)' : 'transparent',
+                           border: hasModifications ? '1px solid rgba(255, 255, 255, 0.05)' : '1px solid transparent',
+                           borderRadius: '6px',
+                           padding: hasModifications ? '8px' : '4px 6px'
+                         }}
+                       >
+                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                           <span style={{ fontWeight: 700, fontSize: '13px', color: 'white' }}>{i.quantity}x {i.name}</span>
+                           {hasModifications && (
+                             <span style={{ fontSize: '8px', background: 'rgba(191,90,242,0.2)', border: '1px solid #bf5af2', color: '#bf5af2', padding: '1px 4px', borderRadius: '3px', fontWeight: 'bold' }}>
+                               MÓDOSÍTOTT
+                             </span>
+                           )}
+                         </div>
+                         {renderKitchenItemModifications(i, db.inventory)}
                        </div>
-                       {renderKitchenItemModifications(i, db.inventory)}
-                     </div>
-                   ))}
+                     );
+                   })}
                  </div>
 
                 {portalView === 'kitchen' && (
