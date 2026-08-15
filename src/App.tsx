@@ -841,6 +841,11 @@ export default function App() {
   const [newSettlementFixedFee, setNewSettlementFixedFee] = useState<number | ''>('');
   const [showApiKey, setShowApiKey] = useState(false);
 
+  // Free Delivery Settlement Admin States
+  const [editingFreeSettlement, setEditingFreeSettlement] = useState<any | null>(null);
+  const [newFreeSettlementZip, setNewFreeSettlementZip] = useState('');
+  const [newFreeSettlementCity, setNewFreeSettlementCity] = useState('');
+
   // Chatbot States
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
@@ -1388,6 +1393,19 @@ export default function App() {
 
     const config = db.deliveryFees || { mode: 'manual', baseFee: 500, perKmFee: 100, settlements: [] };
     const mode = config.mode || 'manual';
+
+    const freeSettlements = config.freeSettlements || [];
+    const lowerAddr = address.toLowerCase();
+    const isFree = freeSettlements.some((s: any) => 
+      (s.zip && lowerAddr.includes(s.zip)) || 
+      (s.city && lowerAddr.includes(s.city.toLowerCase()))
+    );
+
+    if (isFree) {
+      setApiCalculatedDistance(null);
+      console.log(`[Delivery Fee] Free delivery match found for address: "${address}"`);
+      return 0;
+    }
 
     const getFallbackFee = (addr: string) => {
       const settlements = config.settlements || [];
@@ -6737,7 +6755,154 @@ export default function App() {
                         </div>
                       </div>
                     )}
+
+                    {/* Free Delivery Settlements Section */}
+                    <div className="admin-card" style={{ marginTop: '20px', maxWidth: '600px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                        <span className="admin-card-title" style={{ margin: 0 }}>Ingyenes Kiszállítású Települések</span>
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => {
+                            setNewFreeSettlementZip('');
+                            setNewFreeSettlementCity('');
+                            setEditingFreeSettlement({ id: 'NEW' });
+                          }}
+                        >
+                          <Plus size={16} /> Új Ingyenes Település
+                        </button>
+                      </div>
+
+                      <div className="table-container" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                        <table className="admin-table">
+                          <thead>
+                            <tr>
+                              <th>Irányítószám</th>
+                              <th>Település</th>
+                              <th style={{ textAlign: 'right' }}>Műveletek</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(config.freeSettlements || []).map((s: any) => (
+                              <tr key={s.id}>
+                                <td style={{ fontWeight: 600 }}>{s.zip}</td>
+                                <td>{s.city}</td>
+                                <td style={{ textAlign: 'right' }}>
+                                  <button
+                                    className="btn btn-danger"
+                                    style={{ padding: '4px 8px', fontSize: '11px' }}
+                                    onClick={() => {
+                                      if (confirm(`Biztosan törölni szeretnéd a(z) ${s.city} települést az ingyenes listáról?`)) {
+                                        const updated = (config.freeSettlements || []).filter((x: any) => x.id !== s.id);
+                                        saveDatabase({
+                                          ...db,
+                                          deliveryFees: { ...config, freeSettlements: updated }
+                                        });
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                            {(config.freeSettlements || []).length === 0 && (
+                              <tr>
+                                <td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '20px' }}>
+                                  Nincsenek ingyenes települések megadva.
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                     
+                    {/* Add Free Settlement Modal Overlay */}
+                    {editingFreeSettlement && (
+                      <div className="modal-overlay" onClick={() => setEditingFreeSettlement(null)}>
+                        <div className="modal-card" style={{ maxWidth: '400px', background: 'var(--panel-bg)', border: '1px solid var(--glass-border)', padding: '20px' }} onClick={e => e.stopPropagation()}>
+                          <div className="modal-header" style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                            <span className="modal-title" style={{ fontSize: '15px', fontWeight: 700 }}>
+                              Új Ingyenes Település Hozzáadása
+                            </span>
+                            <button className="island-close-btn" style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }} onClick={() => setEditingFreeSettlement(null)}>
+                              <X size={16} />
+                            </button>
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '10px' }}>
+                              <div>
+                                <label className="input-label">Irányítószám</label>
+                                <input 
+                                  type="text" 
+                                  className="input-field"
+                                  value={newFreeSettlementZip}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setNewFreeSettlementZip(val);
+                                    if (ZALA_ZIP_MAP[val]) {
+                                      setNewFreeSettlementCity(ZALA_ZIP_MAP[val]);
+                                    }
+                                  }}
+                                  placeholder="pl: 8900"
+                                />
+                              </div>
+                              <div>
+                                <label className="input-label">Település neve</label>
+                                <input 
+                                  type="text" 
+                                  className="input-field"
+                                  value={newFreeSettlementCity}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setNewFreeSettlementCity(val);
+                                    // Auto-fill ZIP
+                                    const foundZip = Object.keys(ZALA_ZIP_MAP).find(k => ZALA_ZIP_MAP[k].toLowerCase() === val.toLowerCase());
+                                    if (foundZip) {
+                                      setNewFreeSettlementZip(foundZip);
+                                    }
+                                  }}
+                                  placeholder="pl: Zalaegerszeg"
+                                />
+                              </div>
+                            </div>
+
+                            <button
+                              className="btn btn-primary"
+                              style={{ width: '100%', height: '38px', fontWeight: 600, marginTop: '10px' }}
+                              onClick={() => {
+                                if (!newFreeSettlementZip.trim() || !newFreeSettlementCity.trim()) {
+                                  alert('Kérlek töltsd ki az irányítószámot és a település nevét!');
+                                  return;
+                                }
+
+                                const list = config.freeSettlements || [];
+                                const newId = `FREE-${Date.now()}`;
+                                const newObj = {
+                                  id: newId,
+                                  zip: newFreeSettlementZip.trim(),
+                                  city: newFreeSettlementCity.trim()
+                                };
+
+                                saveDatabase({
+                                  ...db,
+                                  deliveryFees: {
+                                    ...config,
+                                    freeSettlements: [...list, newObj]
+                                  }
+                                });
+
+                                setEditingFreeSettlement(null);
+                              }}
+                            >
+                              Mentés
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Add/Edit Settlement Modal Overlay */}
                     {editingSettlement && (
                       <div className="modal-overlay" onClick={() => setEditingSettlement(null)}>
