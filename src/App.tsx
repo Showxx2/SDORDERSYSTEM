@@ -1429,6 +1429,7 @@ export default function App() {
           const distanceKm = distanceValueMeter / 1000.0;
           setApiCalculatedDistance(distanceKm);
           console.log(`[Google Maps API] Distance calculated: ${distanceKm.toFixed(2)} km for destination: ${address}`);
+          console.log(`[Google Maps API Route Link]: https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(address)}`);
           
           let calculatedFee = distanceKm * (config.perKmFee || 0) + (config.baseFee || 0);
           
@@ -1503,6 +1504,7 @@ export default function App() {
             const distanceKm = distanceValueMeter / 1000.0;
             setApiCalculatedDistance(distanceKm);
             console.log(`[Geoapify API] Route Distance: ${distanceKm.toFixed(2)} km`);
+            console.log(`[Geoapify Route Visualizer Link on Google Maps]: https://www.google.com/maps/dir/?api=1&origin=${originCoords[0]},${originCoords[1]}&destination=${destCoords[0]},${destCoords[1]}`);
             
             let calculatedFee = distanceKm * (config.perKmFee || 0) + (config.baseFee || 0);
             
