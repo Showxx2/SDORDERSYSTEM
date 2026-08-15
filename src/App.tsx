@@ -617,6 +617,9 @@ function BrutalClosingAnimation({ onComplete }: { onComplete: () => void }) {
   );
 }
 
+// Geocoding cache to save API credits and speed up queries
+const geocodeCache: { [address: string]: [number, number] } = {};
+
 export default function App() {
   // App States
   const [currentUser, setCurrentUser] = useState<UserItem | null>(null);
@@ -636,6 +639,7 @@ export default function App() {
       baseFee: 500,
       perKmFee: 100,
       googleApiKey: '',
+      geoapifyApiKey: '',
       baseAddress: '',
       rounding: 'exact',
       settlements: []
@@ -1384,15 +1388,13 @@ export default function App() {
     const config = db.deliveryFees || { mode: 'manual', baseFee: 500, perKmFee: 100, settlements: [] };
     const mode = config.mode || 'manual';
 
-    if (mode === 'manual') {
+    const getFallbackFee = (addr: string) => {
       const settlements = config.settlements || [];
-      const lowerAddr = address.toLowerCase();
-      
+      const lowerAddr = addr.toLowerCase();
       const match = settlements.find((s: any) => 
         (s.zip && lowerAddr.includes(s.zip)) || 
         (s.city && lowerAddr.includes(s.city.toLowerCase()))
       );
-
       if (match) {
         if (match.fixedFee !== undefined && match.fixedFee !== null && match.fixedFee !== '') {
           return Number(match.fixedFee);
@@ -1402,7 +1404,11 @@ export default function App() {
         }
       }
       return config.baseFee || 0;
-    } else {
+    };
+
+    if (mode === 'manual') {
+      return getFallbackFee(address);
+    } else if (mode === 'google') {
       const apiKey = config.googleApiKey;
       const origin = config.baseAddress;
       
@@ -1435,23 +1441,70 @@ export default function App() {
         console.error('Google Maps Distance Matrix error:', err);
       }
       
-      // Fallback
-      const settlements = config.settlements || [];
-      const lowerAddr = address.toLowerCase();
-      const match = settlements.find((s: any) => 
-        (s.zip && lowerAddr.includes(s.zip)) || 
-        (s.city && lowerAddr.includes(s.city.toLowerCase()))
-      );
-      if (match) {
-        if (match.fixedFee !== undefined && match.fixedFee !== null && match.fixedFee !== '') {
-          return Number(match.fixedFee);
-        }
-        if (match.distanceKm !== undefined && match.distanceKm !== null && match.distanceKm !== '') {
-          return Math.round(Number(match.distanceKm) * (config.perKmFee || 0) + (config.baseFee || 0));
-        }
+      return getFallbackFee(address);
+    } else if (mode === 'geoapify') {
+      const apiKey = config.geoapifyApiKey;
+      const origin = config.baseAddress;
+
+      if (!apiKey || !origin) {
+        return config.baseFee || 0;
       }
-      return config.baseFee || 0;
+
+      try {
+        let originCoords = geocodeCache[origin];
+        if (!originCoords) {
+          const originGeocodeUrl = `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(origin)}&apiKey=${apiKey}`;
+          const originRes = await fetch(originGeocodeUrl);
+          const originData = await originRes.json();
+          const coords = originData.features?.[0]?.geometry?.coordinates; // [lon, lat]
+          if (coords) {
+            originCoords = [coords[1], coords[0]]; // [lat, lon]
+            geocodeCache[origin] = originCoords;
+          }
+        }
+
+        let destCoords = geocodeCache[address];
+        if (!destCoords) {
+          const destGeocodeUrl = `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(address)}&apiKey=${apiKey}`;
+          const destRes = await fetch(destGeocodeUrl);
+          const destData = await destRes.json();
+          const coords = destData.features?.[0]?.geometry?.coordinates; // [lon, lat]
+          if (coords) {
+            destCoords = [coords[1], coords[0]]; // [lat, lon]
+            geocodeCache[address] = destCoords;
+          }
+        }
+
+        if (originCoords && destCoords) {
+          const routeUrl = `https://api.geoapify.com/v1/routing?waypoints=${originCoords[0]},${originCoords[1]}|${destCoords[0]},${destCoords[1]}&mode=drive&apiKey=${apiKey}`;
+          const routeRes = await fetch(routeUrl);
+          const routeData = await routeRes.json();
+
+          if (routeData.features?.[0]?.properties?.distance !== undefined) {
+            const distanceValueMeter = routeData.features[0].properties.distance;
+            const distanceKm = distanceValueMeter / 1000.0;
+            
+            let calculatedFee = distanceKm * (config.perKmFee || 0) + (config.baseFee || 0);
+            
+            const rounding = config.rounding || 'exact';
+            if (rounding === 'round10') {
+              calculatedFee = Math.round(calculatedFee / 10) * 10;
+            } else if (rounding === 'round100') {
+              calculatedFee = Math.round(calculatedFee / 100) * 100;
+            } else {
+              calculatedFee = Math.round(calculatedFee);
+            }
+            return calculatedFee;
+          }
+        }
+      } catch (err) {
+        console.error('Geoapify Distance Matrix error:', err);
+      }
+
+      return getFallbackFee(address);
     }
+    
+    return config.baseFee || 0;
   };
 
   useEffect(() => {
@@ -6311,6 +6364,13 @@ export default function App() {
                         >
                           Google API Kulcs
                         </button>
+                        <button
+                          className={`btn ${mode === 'geoapify' ? 'btn-primary' : ''}`}
+                          style={{ borderRadius: '9px', padding: '6px 14px', fontSize: '12px', border: 'none', background: mode === 'geoapify' ? 'var(--primary)' : 'transparent', boxShadow: mode === 'geoapify' ? '0 0 10px rgba(0,113,227,0.3)' : 'none', color: mode === 'geoapify' ? 'white' : 'rgba(255,255,255,0.6)' }}
+                          onClick={() => saveDatabase({ ...db, deliveryFees: { ...config, mode: 'geoapify' } })}
+                        >
+                          Geoapify API Kulcs
+                        </button>
                       </div>
                     </div>
 
@@ -6464,6 +6524,111 @@ export default function App() {
                                   });
                                 }}
                                 placeholder="AIzaSy..."
+                              />
+                              <button 
+                                type="button"
+                                className="btn"
+                                onClick={() => setShowApiKey(!showApiKey)}
+                                style={{ position: 'absolute', right: '4px', top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', padding: '4px', color: 'var(--text-secondary)' }}
+                              >
+                                {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="input-label">Étkezde címe (Kiindulási Pont / Főhadiszállás)</label>
+                            <input 
+                              type="text" 
+                              className="input-field"
+                              value={config.baseAddress || ''}
+                              onChange={e => {
+                                saveDatabase({
+                                  ...db,
+                                  deliveryFees: { ...config, baseAddress: e.target.value }
+                                });
+                              }}
+                              placeholder="pl: Zalaegerszeg, Kossuth utca 1."
+                            />
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                            <div>
+                              <label className="input-label">Alapdíj (FT)</label>
+                              <input 
+                                type="number" 
+                                className="input-field"
+                                value={config.baseFee}
+                                onChange={e => {
+                                  saveDatabase({
+                                    ...db,
+                                    deliveryFees: { ...config, baseFee: parseInt(e.target.value) || 0 }
+                                  });
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label className="input-label">Távolsági díj (FT/km)</label>
+                              <input 
+                                type="number" 
+                                className="input-field"
+                                value={config.perKmFee}
+                                onChange={e => {
+                                  saveDatabase({
+                                    ...db,
+                                    deliveryFees: { ...config, perKmFee: parseInt(e.target.value) || 0 }
+                                  });
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="input-label">Díj Kerekítése</label>
+                            <AppleSelect
+                              value={config.rounding || 'exact'}
+                              onChange={val => {
+                                saveDatabase({
+                                  ...db,
+                                  deliveryFees: { ...config, rounding: String(val) }
+                                });
+                              }}
+                              options={[
+                                { value: 'exact', label: 'Tűpontos (Kerekítés nélkül)' },
+                                { value: 'round10', label: 'Kerekítés 10 FT-ra' },
+                                { value: 'round100', label: 'Kerekítés 100 FT-ra' }
+                              ]}
+                              icon={<Activity size={12} />}
+                              isOpen={openRoundingDropdown}
+                              onToggle={() => setOpenRoundingDropdown(!openRoundingDropdown)}
+                              onClose={() => setOpenRoundingDropdown(false)}
+                            />
+                          </div>
+
+                        </div>
+                      </div>
+                    )}
+
+                    {mode === 'geoapify' && (
+                      <div className="admin-card" style={{ maxWidth: '600px' }}>
+                        <span className="admin-card-title">Geoapify API és Kiszámítási Paraméterek</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '10px' }}>
+                          
+                          <div>
+                            <label className="input-label">Geoapify API Kulcs</label>
+                            <div style={{ position: 'relative' }}>
+                              <input 
+                                type={showApiKey ? 'text' : 'password'} 
+                                className="input-field"
+                                value={config.geoapifyApiKey || ''}
+                                style={{ paddingRight: '40px' }}
+                                onChange={e => {
+                                  saveDatabase({
+                                    ...db,
+                                    deliveryFees: { ...config, geoapifyApiKey: e.target.value }
+                                  });
+                                }}
+                                placeholder="Geoapify API kulcs..."
                               />
                               <button 
                                 type="button"
