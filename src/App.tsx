@@ -1459,31 +1459,42 @@ export default function App() {
 
       try {
         let originCoords = geocodeCache[origin];
+        let originFormatted = origin;
         if (!originCoords) {
-          const originGeocodeUrl = `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(origin)}&apiKey=${apiKey}`;
+          const originGeocodeUrl = `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(origin)}&filter=countrycode:hu&apiKey=${apiKey}`;
           const originRes = await fetch(originGeocodeUrl);
           const originData = await originRes.json();
-          const coords = originData.features?.[0]?.geometry?.coordinates; // [lon, lat]
+          const feature = originData.features?.[0];
+          const coords = feature?.geometry?.coordinates; // [lon, lat]
           if (coords) {
             originCoords = [coords[1], coords[0]]; // [lat, lon]
             geocodeCache[origin] = originCoords;
+            originFormatted = feature?.properties?.formatted || origin;
           }
         }
 
         let destCoords = geocodeCache[address];
+        let destFormatted = address;
         if (!destCoords) {
-          const destGeocodeUrl = `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(address)}&apiKey=${apiKey}`;
+          const destGeocodeUrl = `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(address)}&filter=countrycode:hu&apiKey=${apiKey}`;
           const destRes = await fetch(destGeocodeUrl);
           const destData = await destRes.json();
-          const coords = destData.features?.[0]?.geometry?.coordinates; // [lon, lat]
+          const feature = destData.features?.[0];
+          const coords = feature?.geometry?.coordinates; // [lon, lat]
           if (coords) {
             destCoords = [coords[1], coords[0]]; // [lat, lon]
             geocodeCache[address] = destCoords;
+            destFormatted = feature?.properties?.formatted || address;
           }
         }
 
         if (originCoords && destCoords) {
+          console.log(`[Geoapify Geocoding] Origin: "${origin}" -> Resolved: "${originFormatted}" [${originCoords[0]}, ${originCoords[1]}]`);
+          console.log(`[Geoapify Geocoding] Destination: "${address}" -> Resolved: "${destFormatted}" [${destCoords[0]}, ${destCoords[1]}]`);
+
           const routeUrl = `https://api.geoapify.com/v1/routing?waypoints=${originCoords[0]},${originCoords[1]}|${destCoords[0]},${destCoords[1]}&mode=drive&apiKey=${apiKey}`;
+          console.log(`[Geoapify Routing API Query URL]: ${routeUrl}`);
+
           const routeRes = await fetch(routeUrl);
           const routeData = await routeRes.json();
 
@@ -1491,7 +1502,7 @@ export default function App() {
             const distanceValueMeter = routeData.features[0].properties.distance;
             const distanceKm = distanceValueMeter / 1000.0;
             setApiCalculatedDistance(distanceKm);
-            console.log(`[Geoapify API] Distance calculated: ${distanceKm.toFixed(2)} km for destination: ${address}`);
+            console.log(`[Geoapify API] Route Distance: ${distanceKm.toFixed(2)} km`);
             
             let calculatedFee = distanceKm * (config.perKmFee || 0) + (config.baseFee || 0);
             
