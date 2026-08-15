@@ -665,6 +665,7 @@ export default function App() {
   const [customerName, setCustomerName] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
   const [deliveryFee, setDeliveryFee] = useState<number>(0);
+  const [apiCalculatedDistance, setApiCalculatedDistance] = useState<number | null>(null);
   const [selectedCartCustomerId, setSelectedCartCustomerId] = useState<string | null>(null);
   
   const [isPaymentViewActive, setIsPaymentViewActive] = useState(false);
@@ -1407,12 +1408,14 @@ export default function App() {
     };
 
     if (mode === 'manual') {
+      setApiCalculatedDistance(null);
       return getFallbackFee(address);
     } else if (mode === 'google') {
       const apiKey = config.googleApiKey;
       const origin = config.baseAddress;
       
       if (!apiKey || !origin) {
+        setApiCalculatedDistance(null);
         return config.baseFee || 0;
       }
 
@@ -1424,6 +1427,8 @@ export default function App() {
         if (data.status === 'OK' && data.rows?.[0]?.elements?.[0]?.status === 'OK') {
           const distanceValueMeter = data.rows[0].elements[0].distance.value;
           const distanceKm = distanceValueMeter / 1000.0;
+          setApiCalculatedDistance(distanceKm);
+          console.log(`[Google Maps API] Distance calculated: ${distanceKm.toFixed(2)} km for destination: ${address}`);
           
           let calculatedFee = distanceKm * (config.perKmFee || 0) + (config.baseFee || 0);
           
@@ -1441,12 +1446,14 @@ export default function App() {
         console.error('Google Maps Distance Matrix error:', err);
       }
       
+      setApiCalculatedDistance(null);
       return getFallbackFee(address);
     } else if (mode === 'geoapify') {
       const apiKey = config.geoapifyApiKey;
       const origin = config.baseAddress;
 
       if (!apiKey || !origin) {
+        setApiCalculatedDistance(null);
         return config.baseFee || 0;
       }
 
@@ -1483,6 +1490,8 @@ export default function App() {
           if (routeData.features?.[0]?.properties?.distance !== undefined) {
             const distanceValueMeter = routeData.features[0].properties.distance;
             const distanceKm = distanceValueMeter / 1000.0;
+            setApiCalculatedDistance(distanceKm);
+            console.log(`[Geoapify API] Distance calculated: ${distanceKm.toFixed(2)} km for destination: ${address}`);
             
             let calculatedFee = distanceKm * (config.perKmFee || 0) + (config.baseFee || 0);
             
@@ -1501,9 +1510,11 @@ export default function App() {
         console.error('Geoapify Distance Matrix error:', err);
       }
 
+      setApiCalculatedDistance(null);
       return getFallbackFee(address);
     }
     
+    setApiCalculatedDistance(null);
     return config.baseFee || 0;
   };
 
@@ -3684,7 +3695,7 @@ export default function App() {
                       </div>
                       {deliveryFee > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--warning)' }}>
-                          <span>Kiszállítás:</span>
+                          <span>Kiszállítás: {apiCalculatedDistance !== null && `(${apiCalculatedDistance.toFixed(2)} km)`}</span>
                           <span>+{deliveryFee.toLocaleString()} FT</span>
                         </div>
                       )}
