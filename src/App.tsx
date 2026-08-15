@@ -642,7 +642,11 @@ export default function App() {
       geoapifyApiKey: '',
       baseAddress: '',
       rounding: 'exact',
-      settlements: []
+      settlements: [],
+      minOrderAmount: 0,
+      excludePackaging: false,
+      excludeDelivery: false,
+      excludeDiscount: false
     }
   });
 
@@ -1785,12 +1789,43 @@ export default function App() {
   const submitOrder = () => {
     if (cart.length === 0) return;
 
+    const config = db.deliveryFees || { mode: 'manual', baseFee: 500, perKmFee: 100, settlements: [] };
+    const minOrderAmount = config.minOrderAmount || 0;
+    const isDelivery = !!(customerAddress && !customerAddress.toLowerCase().includes('helyben') && !customerAddress.toLowerCase().includes('fogyasztás'));
+
     const subtotal = cart.reduce((sum, item) => {
       const price = item.custom_modifications ? item.custom_modifications.calculated_price : item.price_at_order;
       return sum + (price + item.packaging_fee_at_order) * item.quantity;
     }, 0);
     const discountAmount = subtotal * (discountPercentage / 100);
     const finalAmount = Math.max(0, Math.round(subtotal - discountAmount) + deliveryFee);
+
+    if (isDelivery && minOrderAmount > 0) {
+      const itemsTotal = cart.reduce((sum, item) => {
+        const price = item.custom_modifications ? item.custom_modifications.calculated_price : item.price_at_order;
+        return sum + price * item.quantity;
+      }, 0);
+      const packagingTotal = cart.reduce((sum, item) => {
+        return sum + item.packaging_fee_at_order * item.quantity;
+      }, 0);
+      const discountVal = (itemsTotal + packagingTotal) * (discountPercentage / 100);
+
+      let minSumToCheck = itemsTotal;
+      if (!config.excludePackaging) {
+        minSumToCheck += packagingTotal;
+      }
+      if (!config.excludeDelivery) {
+        minSumToCheck += deliveryFee;
+      }
+      if (!config.excludeDiscount) {
+        minSumToCheck -= discountVal;
+      }
+
+      if (minSumToCheck < minOrderAmount) {
+        alert(`A rendelés nem éri el a minimális összeget! Kiszállítási minimum: ${minOrderAmount.toLocaleString()} FT (Beszámított összeg: ${Math.round(minSumToCheck).toLocaleString()} FT)`);
+        return;
+      }
+    }
 
     const newOrder: Order = {
       id: db.orders.length > 0 ? Math.max(...db.orders.map((o: any) => o.id)) + 1 : 1,
@@ -3713,102 +3748,155 @@ export default function App() {
               {/* Cart details and buttons at bottom */}
               <div className="cart-actions">
                 {(() => {
+                  const config = db.deliveryFees || { mode: 'manual', baseFee: 500, perKmFee: 100, settlements: [] };
+                  const minOrderAmount = config.minOrderAmount || 0;
+                  const isDelivery = !!(customerAddress && !customerAddress.toLowerCase().includes('helyben') && !customerAddress.toLowerCase().includes('fogyasztás'));
+
                   const subtotal = cart.reduce((sum, item) => {
                     const price = item.custom_modifications ? item.custom_modifications.calculated_price : item.price_at_order;
                     return sum + (price + item.packaging_fee_at_order) * item.quantity;
                   }, 0);
+
+                  const itemsTotal = cart.reduce((sum, item) => {
+                    const price = item.custom_modifications ? item.custom_modifications.calculated_price : item.price_at_order;
+                    return sum + price * item.quantity;
+                  }, 0);
+                  const packagingTotal = cart.reduce((sum, item) => {
+                    return sum + item.packaging_fee_at_order * item.quantity;
+                  }, 0);
+                  const discountVal = (itemsTotal + packagingTotal) * (discountPercentage / 100);
+
+                  let minSumToCheck = itemsTotal;
+                  if (!config.excludePackaging) {
+                    minSumToCheck += packagingTotal;
+                  }
+                  if (!config.excludeDelivery) {
+                    minSumToCheck += deliveryFee;
+                  }
+                  if (!config.excludeDiscount) {
+                    minSumToCheck -= discountVal;
+                  }
+
+                  const isMinOrderAmountViolated = !!(isDelivery && minOrderAmount > 0 && minSumToCheck < minOrderAmount);
                   const finalCartTotal = Math.max(0, Math.round(subtotal * (1 - discountPercentage / 100)) + deliveryFee);
+                  
                   return (
-                    <div className="cart-summary" style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '10px', marginBottom: '10px', fontSize: '13px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
-                        <span>Részösszeg:</span>
-                        <span>{subtotal.toLocaleString()} FT</span>
+                    <>
+                      <div className="cart-summary" style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderBottom: '1px solid var(--glass-border)', paddingBottom: '10px', marginBottom: '10px', fontSize: '13px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                          <span>Részösszeg:</span>
+                          <span>{subtotal.toLocaleString()} FT</span>
+                        </div>
+                        {deliveryFee > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--warning)' }}>
+                            <span>Kiszállítás {apiCalculatedDistance !== null && `(${apiCalculatedDistance.toFixed(2)} km)`}:</span>
+                            <span>+{deliveryFee.toLocaleString()} FT</span>
+                          </div>
+                        )}
+                        {discountPercentage > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--success)' }}>
+                            <span>Kedvezmény ({discountPercentage}%):</span>
+                            <span>-{Math.round(subtotal * (discountPercentage / 100)).toLocaleString()} FT</span>
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: 700, color: 'white', marginTop: '4px', paddingTop: '4px', borderTop: '1px dashed rgba(255,255,255,0.08)' }}>
+                          <span>Összesen:</span>
+                          <span style={{ color: 'var(--primary)' }}>{finalCartTotal.toLocaleString()} FT</span>
+                        </div>
                       </div>
-                      {deliveryFee > 0 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--warning)' }}>
-                          <span>Kiszállítás {apiCalculatedDistance !== null && `(${apiCalculatedDistance.toFixed(2)} km)`}:</span>
-                          <span>+{deliveryFee.toLocaleString()} FT</span>
+
+                      {isMinOrderAmountViolated && (
+                        <div style={{
+                          background: 'rgba(255, 69, 58, 0.12)',
+                          border: '1px solid rgba(255, 69, 58, 0.3)',
+                          borderRadius: '8px',
+                          padding: '8px 12px',
+                          color: '#ff453a',
+                          fontSize: '12px',
+                          marginBottom: '10px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '4px',
+                          fontWeight: 500
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <AlertTriangle size={14} />
+                            <span>Nem érte el a minimum összeget!</span>
+                          </div>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+                            Kiszállítási minimum: <strong>{minOrderAmount.toLocaleString()} FT</strong> (Jelenleg beszámítva: {Math.round(minSumToCheck).toLocaleString()} FT)
+                          </span>
                         </div>
                       )}
-                      {discountPercentage > 0 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--success)' }}>
-                          <span>Kedvezmény ({discountPercentage}%):</span>
-                          <span>-{Math.round(subtotal * (discountPercentage / 100)).toLocaleString()} FT</span>
-                        </div>
-                      )}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: 700, color: 'white', marginTop: '4px', paddingTop: '4px', borderTop: '1px dashed rgba(255,255,255,0.08)' }}>
-                        <span>Összesen:</span>
-                        <span style={{ color: 'var(--primary)' }}>{finalCartTotal.toLocaleString()} FT</span>
+
+                      {/* 3 configuration buttons */}
+                      <button 
+                        className={`btn ${selectedCartCustomerId ? 'btn-success' : ''}`}
+                        onClick={() => {
+                          if (selectedCartCustomerId) {
+                            const cust = db.customers.find((c: any) => c.id === selectedCartCustomerId);
+                            if (cust) {
+                              setSelectedCustomerIdForEdit(selectedCartCustomerId);
+                              setEditingCustomerData({ ...cust });
+                              setIsCreatingNewCustomer(false);
+                            }
+                          }
+                          setIsCustomerViewActive(true);
+                        }} 
+                      >
+                        <User size={14} />
+                        Ügyfél adatai {customerName && '✓'}
+                      </button>
+                      
+                      <button 
+                        className="btn" 
+                        onClick={() => {
+                          setIsCustomerViewActive(false);
+                          setIsPaymentViewActive(true);
+                        }} 
+                        disabled={cart.length === 0}
+                        style={{ 
+                          opacity: cart.length === 0 ? 0.6 : 1,
+                          ...getPaymentMethodStyle(paymentMethod)
+                        }}
+                      >
+                        {getPaymentMethodIcon(paymentMethod, 14)}
+                        Fizetés: {paymentMethod}
+                      </button>
+                      
+                      <button 
+                        className="btn" 
+                        onClick={() => setShowDiscountModal(true)} 
+                        disabled={cart.length === 0}
+                        style={{ opacity: cart.length === 0 ? 0.6 : 1 }}
+                      >
+                        <Percent size={14} />
+                        Kedvezmény {discountPercentage > 0 && `(${discountPercentage}%)`}
+                      </button>
+
+                      {/* Submit / Cancel row in 4:1 ratio */}
+                      <div className="cart-submit-cancel-row">
+                        <button 
+                          className={`btn btn-success ${cart.length > 0 && !isMinOrderAmountViolated ? 'btn-submit-order-animate' : ''}`} 
+                          onClick={submitOrder}
+                          disabled={cart.length === 0 || isMinOrderAmountViolated}
+                          style={{ opacity: (cart.length === 0 || isMinOrderAmountViolated) ? 0.5 : 1 }}
+                        >
+                          Beküldés
+                        </button>
+                        <button 
+                          className="btn btn-danger" 
+                          onClick={clearCart}
+                          disabled={cart.length === 0}
+                          style={{ opacity: cart.length === 0 ? 0.6 : 1 }}
+                          title="Kosár ürítése / Mégse"
+                        >
+                          <Trash2 size={16} />
+                        </button>
                       </div>
-                    </div>
+                    </>
                   );
                 })()}
-                
-                {/* 3 configuration buttons */}
-                <button 
-                  className={`btn ${selectedCartCustomerId ? 'btn-success' : ''}`}
-                  onClick={() => {
-                    if (selectedCartCustomerId) {
-                      const cust = db.customers.find((c: any) => c.id === selectedCartCustomerId);
-                      if (cust) {
-                        setSelectedCustomerIdForEdit(selectedCartCustomerId);
-                        setEditingCustomerData({ ...cust });
-                        setIsCreatingNewCustomer(false);
-                      }
-                    }
-                    setIsCustomerViewActive(true);
-                  }} 
-                >
-                  <User size={14} />
-                  Ügyfél adatai {customerName && '✓'}
-                </button>
-                
-                <button 
-                  className="btn" 
-                  onClick={() => {
-                    setIsCustomerViewActive(false);
-                    setIsPaymentViewActive(true);
-                  }} 
-                  disabled={cart.length === 0}
-                  style={{ 
-                    opacity: cart.length === 0 ? 0.6 : 1,
-                    ...getPaymentMethodStyle(paymentMethod)
-                  }}
-                >
-                  {getPaymentMethodIcon(paymentMethod, 14)}
-                  Fizetés: {paymentMethod}
-                </button>
-                
-                <button 
-                  className="btn" 
-                  onClick={() => setShowDiscountModal(true)} 
-                  disabled={cart.length === 0}
-                  style={{ opacity: cart.length === 0 ? 0.6 : 1 }}
-                >
-                  <Percent size={14} />
-                  Kedvezmény {discountPercentage > 0 && `(${discountPercentage}%)`}
-                </button>
-
-                {/* Submit / Cancel row in 4:1 ratio */}
-                <div className="cart-submit-cancel-row">
-                  <button 
-                    className={`btn btn-success ${cart.length > 0 ? 'btn-submit-order-animate' : ''}`} 
-                    onClick={submitOrder}
-                    disabled={cart.length === 0}
-                    style={{ opacity: cart.length === 0 ? 0.6 : 1 }}
-                  >
-                    Beküldés
-                  </button>
-                  <button 
-                    className="btn btn-danger" 
-                    onClick={clearCart}
-                    disabled={cart.length === 0}
-                    style={{ opacity: cart.length === 0 ? 0.6 : 1 }}
-                    title="Kosár ürítése / Mégse"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
               </div>
             </aside>
 
@@ -6755,6 +6843,76 @@ export default function App() {
                         </div>
                       </div>
                     )}
+
+                    {/* Minimum Order Amount and Exclusions Settings Card */}
+                    <div className="admin-card" style={{ marginTop: '20px', maxWidth: '600px' }}>
+                      <span className="admin-card-title">Minimális Rendelési Összeg és Kizárások</span>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '10px' }}>
+                        <div>
+                          <label className="input-label">Minimális Kiszállítási Összeg (FT)</label>
+                          <input 
+                            type="number" 
+                            className="input-field"
+                            value={config.minOrderAmount || ''}
+                            onChange={e => {
+                              saveDatabase({
+                                ...db,
+                                deliveryFees: { ...config, minOrderAmount: Math.max(0, parseInt(e.target.value) || 0) }
+                              });
+                            }}
+                            placeholder="pl: 3000"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="input-label" style={{ marginBottom: '8px' }}>Összeg számításából KIZÁRT tételek:</label>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <label className="checkbox-container" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                              <input 
+                                type="checkbox"
+                                checked={config.excludePackaging || false}
+                                onChange={e => {
+                                  saveDatabase({
+                                    ...db,
+                                    deliveryFees: { ...config, excludePackaging: e.target.checked }
+                                  });
+                                }}
+                              />
+                              Ételek csomagolása (Packaging fee)
+                            </label>
+
+                            <label className="checkbox-container" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                              <input 
+                                type="checkbox"
+                                checked={config.excludeDelivery || false}
+                                onChange={e => {
+                                  saveDatabase({
+                                    ...db,
+                                    deliveryFees: { ...config, excludeDelivery: e.target.checked }
+                                  });
+                                }}
+                              />
+                              Kiszállítási díj (Delivery fee)
+                            </label>
+
+                            <label className="checkbox-container" style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px' }}>
+                              <input 
+                                type="checkbox"
+                                checked={config.excludeDiscount || false}
+                                onChange={e => {
+                                  saveDatabase({
+                                    ...db,
+                                    deliveryFees: { ...config, excludeDiscount: e.target.checked }
+                                  });
+                                }}
+                              />
+                              Kedvezmény (Discount)
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
 
                     {/* Free Delivery Settlements Section */}
                     <div className="admin-card" style={{ marginTop: '20px', maxWidth: '600px' }}>
