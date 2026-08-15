@@ -808,6 +808,7 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 16px;
+  animation: fade-slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Category Cards */

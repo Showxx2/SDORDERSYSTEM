@@ -3561,7 +3561,7 @@ export default function App() {
                     <Layers size={22} color="var(--primary)" />
                     Étlap Kategóriák
                   </h2>
-                  <div className="cards-grid">
+                  <div className="cards-grid" key="categories-view">
                     {db.categories.filter((cat: Category) => cat.is_active !== false).map((cat: Category) => (
                       <div 
                         key={cat.id} 
@@ -3583,7 +3583,7 @@ export default function App() {
                     </button>
                     {db.categories.find((c: any) => c.id === selectedCategoryId)?.name}
                   </h2>
-                  <div className="cards-grid">
+                  <div className="cards-grid" key={`items-view-${selectedCategoryId}`}>
                     {db.items
                       .filter((item: MenuItem) => item.category_id === selectedCategoryId && item.is_active !== false)
                       .map((item: MenuItem) => (
@@ -3708,7 +3708,7 @@ export default function App() {
                       </div>
                       {deliveryFee > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--warning)' }}>
-                          <span>Kiszállítás: {apiCalculatedDistance !== null && `(${apiCalculatedDistance.toFixed(2)} km)`}</span>
+                          <span>Kiszállítás {apiCalculatedDistance !== null && `(${apiCalculatedDistance.toFixed(2)} km)`}:</span>
                           <span>+{deliveryFee.toLocaleString()} FT</span>
                         </div>
                       )}
