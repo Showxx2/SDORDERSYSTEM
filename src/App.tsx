@@ -4646,14 +4646,38 @@ export default function App() {
                                   <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)' }}>
                                     Időzített Árazás & Akciók
                                   </span>
-                                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer', margin: 0 }}>
-                                    <input 
-                                      type="checkbox"
-                                      checked={promoIsEnabled}
-                                      onChange={e => setPromoIsEnabled(e.target.checked)}
-                                    />
-                                    Engedélyezés
-                                  </label>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', userSelect: 'none' }}>
+                                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                                      {promoIsEnabled ? 'Engedélyezve' : 'Kitiltva'}
+                                    </span>
+                                    <div 
+                                      onClick={() => setPromoIsEnabled(!promoIsEnabled)}
+                                      style={{
+                                        width: '36px',
+                                        height: '20px',
+                                        borderRadius: '10px',
+                                        background: promoIsEnabled ? '#30d158' : '#ff453a',
+                                        position: 'relative',
+                                        cursor: 'pointer',
+                                        transition: 'background-color 0.2s ease',
+                                        boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)'
+                                      }}
+                                    >
+                                      <div 
+                                        style={{
+                                          width: '16px',
+                                          height: '16px',
+                                          borderRadius: '50%',
+                                          background: 'white',
+                                          position: 'absolute',
+                                          top: '2px',
+                                          left: promoIsEnabled ? '18px' : '2px',
+                                          transition: 'left 0.2s ease',
+                                          boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
                                 </div>
 
                                 {promoIsEnabled && (
@@ -4998,14 +5022,38 @@ export default function App() {
                               <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)' }}>
                                 Időzített Árazás & Akciók
                               </span>
-                              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', cursor: 'pointer', margin: 0 }}>
-                                <input 
-                                  type="checkbox"
-                                  checked={promoIsEnabled}
-                                  onChange={e => setPromoIsEnabled(e.target.checked)}
-                                />
-                                Engedélyezés
-                              </label>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', userSelect: 'none' }}>
+                                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                                  {promoIsEnabled ? 'Engedélyezve' : 'Kitiltva'}
+                                </span>
+                                <div 
+                                  onClick={() => setPromoIsEnabled(!promoIsEnabled)}
+                                  style={{
+                                    width: '36px',
+                                    height: '20px',
+                                    borderRadius: '10px',
+                                    background: promoIsEnabled ? '#30d158' : '#ff453a',
+                                    position: 'relative',
+                                    cursor: 'pointer',
+                                    transition: 'background-color 0.2s ease',
+                                    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)'
+                                  }}
+                                >
+                                  <div 
+                                    style={{
+                                      width: '16px',
+                                      height: '16px',
+                                      borderRadius: '50%',
+                                      background: 'white',
+                                      position: 'absolute',
+                                      top: '2px',
+                                      left: promoIsEnabled ? '18px' : '2px',
+                                      transition: 'left 0.2s ease',
+                                      boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
+                                    }}
+                                  />
+                                </div>
+                              </div>
                             </div>
 
                             {promoIsEnabled && (
