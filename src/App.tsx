@@ -803,6 +803,8 @@ export default function App() {
   
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [discountPercentage, setDiscountPercentage] = useState<number>(0);
+  const [showTodayOrdersModal, setShowTodayOrdersModal] = useState(false);
+  const [selectedDetailOrderId, setSelectedDetailOrderId] = useState<number | null>(null);
 
   // Active Order Selection (for detail preview if clicked)
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
@@ -3265,7 +3267,7 @@ export default function App() {
         <div className="navbar-left">
           {currentUser && (
             <>
-              <button className="btn" onClick={() => { setView('admin'); setAdminTab('history'); }}>
+              <button className="btn" onClick={() => { setShowTodayOrdersModal(true); setSelectedDetailOrderId(null); }}>
                 <History size={16} />
                 Előzmények
               </button>
@@ -9087,6 +9089,212 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* ================= MODAL: MAI RENDELÉSEK ELŐZMÉNYEI ================= */}
+      {showTodayOrdersModal && (
+        <div className="modal-overlay" onClick={() => setShowTodayOrdersModal(false)}>
+          <div className="modal-card" style={{ maxWidth: '900px', width: '95%', maxHeight: '85vh', background: 'var(--panel-bg)', border: '1px solid var(--glass-border)', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header" style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span className="modal-title" style={{ fontSize: '16px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <History size={18} color="var(--primary)" />
+                Mai Leadott Rendelések
+              </span>
+              <button className="island-close-btn" style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }} onClick={() => setShowTodayOrdersModal(false)}>
+                <X size={16} />
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.8fr', gap: '20px', flex: 1, minHeight: 0 }}>
+              {/* Left side: List of today's orders */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', paddingRight: '4px', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+                {db.orders && db.orders.filter((o: any) => !o.archived).length > 0 ? (
+                  db.orders
+                    .filter((o: any) => !o.archived)
+                    .map((o: any) => {
+                      const isSelected = selectedDetailOrderId === o.id;
+                      const courier = db.users.find((u: any) => u.id === o.assigned_courier_id);
+                      return (
+                        <div
+                          key={o.id}
+                          onClick={() => setSelectedDetailOrderId(o.id)}
+                          style={{
+                            background: isSelected ? 'rgba(10, 132, 255, 0.1)' : 'rgba(255,255,255,0.02)',
+                            border: isSelected ? '1px solid var(--primary)' : '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: '8px',
+                            padding: '10px 12px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <strong style={{ fontSize: '13px', color: 'white' }}>{o.customer_name}</strong>
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)' }}>
+                              {o.total_amount.toLocaleString()} FT
+                            </span>
+                          </div>
+
+                          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              📍 {o.customer_address}
+                            </span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px' }}>
+                              <span>💳 {o.payment_method}</span>
+                              {o.discount_percentage > 0 && (
+                                <span style={{ color: 'var(--success)' }}>🏷️ -{o.discount_percentage}%</span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', justifyContent: 'space-between' }}>
+                              <span>🚗 Futár: {courier ? courier.name : 'Nincs'}</span>
+                              <span>{new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                ) : (
+                  <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px', fontStyle: 'italic' }}>
+                    Nincsenek mai rendelések.
+                  </div>
+                )}
+              </div>
+
+              {/* Right side: Detailed Order View */}
+              <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {(() => {
+                  if (!selectedDetailOrderId) {
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', gap: '8px' }}>
+                        <History size={32} style={{ opacity: 0.3 }} />
+                        <span style={{ fontSize: '12px', fontStyle: 'italic' }}>Válassz ki egy rendelést a részletek megtekintéséhez!</span>
+                      </div>
+                    );
+                  }
+                  const order = db.orders.find((o: any) => o.id === selectedDetailOrderId);
+                  if (!order) return null;
+
+                  const courier = db.users.find((u: any) => u.id === order.assigned_courier_id);
+
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div style={{ borderBottom: '1px dashed rgba(255,255,255,0.08)', paddingBottom: '10px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                          <h3 style={{ margin: 0, fontSize: '14px', color: 'white' }}>{order.customer_name}</h3>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                            Rendelés ID: #{order.id} | {new Date(order.created_at).toLocaleString()}
+                          </span>
+                        </div>
+                        <div style={{ marginTop: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                          📍 <strong>Cím:</strong> {order.customer_address}
+                        </div>
+                      </div>
+
+                      {/* Meta details grid */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', background: 'rgba(255,255,255,0.02)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)', fontSize: '12px' }}>
+                        <div>
+                          <strong>Fizetési mód:</strong> {order.payment_method}
+                        </div>
+                        <div>
+                          <strong>Kedvezmény:</strong> {order.discount_percentage > 0 ? `${order.discount_percentage}%` : 'Nincs'}
+                        </div>
+                        <div>
+                          <strong>Futár:</strong> {courier ? courier.name : 'Nincs kijelölve'}
+                        </div>
+                        <div>
+                          <strong>Felvevő:</strong> {order.created_by_user || 'Nincs adat'}
+                        </div>
+                        {order.delivery_fee !== undefined && (
+                          <div>
+                            <strong>Kiszállítási díj:</strong> {order.delivery_fee.toLocaleString()} FT
+                          </div>
+                        )}
+                        <div>
+                          <strong>Státusz:</strong> {order.status === 'completed' ? 'Lezárt' : 'Függőben'}
+                        </div>
+                      </div>
+
+                      {/* Items List */}
+                      <div>
+                        <label className="input-label" style={{ fontSize: '11px', marginBottom: '6px' }}>Rendelt Tételek</label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {order.items.map((item: any, idx: number) => {
+                            const portionLabel = item.custom_modifications?.portion === 'half' ? ' (Fél adag)' : '';
+                            const mods = item.custom_modifications;
+                            const calculatedPrice = mods ? mods.calculated_price : item.price_at_order;
+                            
+                            return (
+                              <div 
+                                key={idx} 
+                                style={{
+                                  background: 'rgba(255,255,255,0.01)',
+                                  border: '1px solid rgba(255,255,255,0.04)',
+                                  borderRadius: '8px',
+                                  padding: '8px 10px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '4px'
+                                }}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                                  <div>
+                                    <strong style={{ color: 'white' }}>{item.quantity}x</strong> {item.name}{portionLabel}
+                                  </div>
+                                  <span style={{ fontWeight: 600, color: 'var(--primary)' }}>
+                                    {((calculatedPrice + item.packaging_fee_at_order) * item.quantity).toLocaleString()} FT
+                                  </span>
+                                </div>
+
+                                <div style={{ fontSize: '10px', color: 'var(--text-muted)', paddingLeft: '14px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  <span>Egységár: {calculatedPrice.toLocaleString()} FT | Csomagolás: {item.packaging_fee_at_order.toLocaleString()} FT</span>
+                                  {mods && (
+                                    <>
+                                      {mods.note && <span>📝 Megjegyzés: "{mods.note}"</span>}
+                                      {mods.linked_item && <span>🔗 Csatolmány: {mods.linked_item.name} (+{mods.linked_item.price_at_order.toLocaleString()} FT)</span>}
+                                      {mods.ingredient_adjustments && Object.keys(mods.ingredient_adjustments).length > 0 && (
+                                        <span>
+                                          🥕 Alapanyagok: {
+                                            Object.keys(mods.ingredient_adjustments).map(ingId => {
+                                              const inv = db.inventory.find((i: any) => i.id === Number(ingId));
+                                              const adj = mods.ingredient_adjustments[ingId];
+                                              return `${inv ? inv.name : ingId} (${adj === 'none' ? 'Kihagyva' : adj === 'double' ? 'Dupla' : 'Normál'})`;
+                                            }).join(', ')
+                                          }
+                                        </span>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Summary total */}
+                      <div style={{
+                        borderTop: '1px solid rgba(255,255,255,0.08)',
+                        paddingTop: '10px',
+                        marginTop: '6px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'baseline'
+                      }}>
+                        <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Fizetendő Végösszeg</span>
+                        <strong style={{ fontSize: '18px', color: 'var(--primary)' }}>
+                          {order.total_amount.toLocaleString()} FT
+                        </strong>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ================= MODAL: FIZETÉSI MÓD ================= */}
       {isPaymentViewActive && (
         <div className="modal-overlay" onClick={() => setIsPaymentViewActive(false)}>
