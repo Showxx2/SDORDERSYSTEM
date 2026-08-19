@@ -1022,6 +1022,7 @@ export default function App() {
   ]);
   
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const promoPanelRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll chat to bottom
   useEffect(() => {
@@ -4632,7 +4633,7 @@ export default function App() {
                             const hasCategoryPromotion = !!(itemCategory && itemCategory.promotion?.isEnabled);
                             const categoryName = itemCategory ? itemCategory.name : '';
                             return (
-                              <div style={{
+                              <div ref={promoPanelRef} style={{
                                 border: '1px solid rgba(255,255,255,0.08)',
                                 borderRadius: '10px',
                                 padding: '14px',
@@ -4648,10 +4649,18 @@ export default function App() {
                                   </span>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', userSelect: 'none' }}>
                                     <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                                      {promoIsEnabled ? 'Engedélyezve' : 'Kitiltva'}
+                                      {promoIsEnabled ? 'Aktív' : 'Deaktív'}
                                     </span>
                                     <div 
-                                      onClick={() => setPromoIsEnabled(!promoIsEnabled)}
+                                      onClick={() => {
+                                        const nextVal = !promoIsEnabled;
+                                        setPromoIsEnabled(nextVal);
+                                        if (nextVal) {
+                                          setTimeout(() => {
+                                            promoPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                                          }, 80);
+                                        }
+                                      }}
                                       style={{
                                         width: '36px',
                                         height: '20px',
@@ -5008,7 +5017,7 @@ export default function App() {
                           )}
 
                           {/* TIMED PROMOTION CONFIGURATION CARD */}
-                          <div style={{
+                          <div ref={promoPanelRef} style={{
                             border: '1px solid rgba(255,255,255,0.08)',
                             borderRadius: '10px',
                             padding: '14px',
@@ -5027,7 +5036,15 @@ export default function App() {
                                   {promoIsEnabled ? 'Engedélyezve' : 'Kitiltva'}
                                 </span>
                                 <div 
-                                  onClick={() => setPromoIsEnabled(!promoIsEnabled)}
+                                  onClick={() => {
+                                    const nextVal = !promoIsEnabled;
+                                    setPromoIsEnabled(nextVal);
+                                    if (nextVal) {
+                                      setTimeout(() => {
+                                        promoPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                                      }, 80);
+                                    }
+                                  }}
                                   style={{
                                     width: '36px',
                                     height: '20px',
