@@ -367,7 +367,8 @@ function AppleSelect<T extends string | number>({
   icon,
   isOpen,
   onToggle,
-  onClose
+  onClose,
+  openUpward = false
 }: {
   value: T;
   onChange: (val: T) => void;
@@ -376,6 +377,7 @@ function AppleSelect<T extends string | number>({
   isOpen: boolean;
   onToggle: () => void;
   onClose: () => void;
+  openUpward?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -431,7 +433,7 @@ function AppleSelect<T extends string | number>({
         <div
           style={{
             position: 'absolute',
-            top: 'calc(100% + 6px)',
+            ...(openUpward ? { bottom: 'calc(100% + 6px)' } : { top: 'calc(100% + 6px)' }),
             left: 0,
             right: 0,
             background: '#1c1c1e',
@@ -3597,7 +3599,7 @@ export default function App() {
                                 setIsCustomerViewActive(false);
                               }}
                             >
-                              Le okézom
+                              Kiválasztom
                             </button>
                           </div>
 
@@ -4394,6 +4396,7 @@ export default function App() {
                                   isOpen={openItemIngredDropdown}
                                   onToggle={() => setOpenItemIngredDropdown(!openItemIngredDropdown)}
                                   onClose={() => setOpenItemIngredDropdown(false)}
+                                  openUpward={true}
                                 />
                               </div>
                               <div>
@@ -4545,6 +4548,7 @@ export default function App() {
                               isOpen={openCatLinkDropdown}
                               onToggle={() => setOpenCatLinkDropdown(!openCatLinkDropdown)}
                               onClose={() => setOpenCatLinkDropdown(false)}
+                              openUpward={true}
                             />
                           </div>
 
