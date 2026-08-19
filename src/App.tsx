@@ -54,6 +54,29 @@ interface PromotionSettings {
   packagingFeePolicy: 'standard' | 'free' | 'discounted';
 }
 
+interface CourseDefinition {
+  id: number;
+  name: string; // e.g. "Első fogás"
+  sourceType: 'category' | 'individual';
+  sourceCategoryId?: number | null;
+  itemIds?: number[];
+  itemOverrides?: {
+    [itemId: number]: {
+      price: number;
+      ingredients: {
+        ingredientId: number;
+        quantity: number;
+      }[];
+    }
+  };
+}
+
+interface MenuSchedule {
+  days?: number[]; // 1 = Monday, 7 = Sunday
+  fromTime?: string; // "HH:MM"
+  toTime?: string; // "HH:MM"
+}
+
 interface Category {
   id: number;
   name: string;
@@ -62,6 +85,9 @@ interface Category {
   linked_category_id?: number | null;
   include_linked_packaging_fee?: boolean;
   promotion?: PromotionSettings;
+  is_menu_category?: boolean;
+  courses?: CourseDefinition[];
+  menu_schedule?: MenuSchedule;
 }
 
 interface MenuItem {
@@ -76,6 +102,16 @@ interface MenuItem {
   allergens?: string[];
   is_active?: boolean;
   promotion?: PromotionSettings;
+}
+
+interface MenuCourseChoice {
+  courseId: number;
+  courseName: string;
+  itemId: number | null; // null if skipped
+  itemName: string;
+  price: number;
+  packagingFee: number;
+  ingredients: { ingredientId: number; quantity: number }[];
 }
 
 interface OrderItem {
@@ -95,6 +131,8 @@ interface OrderItem {
       name: string;
       price_at_order: number;
     } | null;
+    is_menu_order?: boolean;
+    selected_courses?: MenuCourseChoice[];
   };
 }
 
@@ -171,6 +209,30 @@ const renderUserIcon = (symbol: string, size = 16, color = 'white') => {
 
 const renderKitchenItemModifications = (item: OrderItem, inventory: any[]) => {
   if (!item.custom_modifications) return null;
+
+  if (item.custom_modifications.is_menu_order) {
+    const selectedCourses = item.custom_modifications.selected_courses || [];
+    return (
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '4px',
+        marginTop: '6px',
+        padding: '6px 10px',
+        textAlign: 'left',
+        background: 'rgba(10, 132, 255, 0.05)',
+        border: '1px solid rgba(10, 132, 255, 0.15)',
+        borderRadius: '8px'
+      }}>
+        {selectedCourses.map((choice, idx) => (
+          <div key={idx} style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+            <strong style={{ color: 'var(--primary)' }}>{choice.courseName}:</strong> {choice.itemName}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   const { portion, ingredient_adjustments, note, linked_item } = item.custom_modifications;
 
   const doubleIngs: string[] = [];
@@ -496,6 +558,36 @@ function AppleSelect<T extends string | number>({
   );
 }
 
+function isCategoryVisible(category: Category, date: Date = new Date()): boolean {
+  if (category.is_active === false) return false;
+  if (!category.is_menu_category) return true;
+  if (!category.menu_schedule) return true;
+
+  const schedule = category.menu_schedule;
+  
+  if (schedule.days && schedule.days.length > 0) {
+    const day = date.getDay() === 0 ? 7 : date.getDay();
+    if (!schedule.days.includes(day)) return false;
+  }
+
+  const currentMinutes = date.getHours() * 60 + date.getMinutes();
+  
+  const parseTimeToMinutes = (timeStr?: string) => {
+    if (!timeStr) return null;
+    const parts = timeStr.split(':');
+    if (parts.length !== 2) return null;
+    return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+  };
+
+  const fromMin = parseTimeToMinutes(schedule.fromTime);
+  const toMin = parseTimeToMinutes(schedule.toTime);
+
+  if (fromMin !== null && currentMinutes < fromMin) return false;
+  if (toMin !== null && currentMinutes > toMin) return false;
+
+  return true;
+}
+
 function isPromotionActive(promo: PromotionSettings | undefined, date: Date): boolean {
   if (!promo || !promo.isEnabled) return false;
 
@@ -805,6 +897,10 @@ export default function App() {
   const [discountPercentage, setDiscountPercentage] = useState<number>(0);
   const [showTodayOrdersModal, setShowTodayOrdersModal] = useState(false);
   const [selectedDetailOrderId, setSelectedDetailOrderId] = useState<number | null>(null);
+  const [showMenuWizardModal, setShowMenuWizardModal] = useState(false);
+  const [wizardCategory, setWizardCategory] = useState<Category | null>(null);
+  const [wizardCourseIndex, setWizardCourseIndex] = useState(0);
+  const [wizardChoices, setWizardChoices] = useState<MenuCourseChoice[]>([]);
 
   // Active Order Selection (for detail preview if clicked)
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
@@ -941,6 +1037,11 @@ export default function App() {
   const [newCatLinkedCategoryId, setNewCatLinkedCategoryId] = useState<number | 'none'>('none');
   const [newCatIncludeLinkedPackagingFee, setNewCatIncludeLinkedPackagingFee] = useState(false);
   const [openCatLinkDropdown, setOpenCatLinkDropdown] = useState(false);
+  const [newCatIsMenuCategory, setNewCatIsMenuCategory] = useState(false);
+  const [newCatCourses, setNewCatCourses] = useState<CourseDefinition[]>([]);
+  const [newCatScheduleDays, setNewCatScheduleDays] = useState<number[]>([]);
+  const [newCatScheduleFrom, setNewCatScheduleFrom] = useState('');
+  const [newCatScheduleTo, setNewCatScheduleTo] = useState('');
 
   // Promotion Edit States
   const [promoIsEnabled, setPromoIsEnabled] = useState(false);
@@ -979,6 +1080,20 @@ export default function App() {
       setPromoPriceAdjustmentType('percent');
       setPromoPriceAdjustmentValue(0);
       setPromoPackagingFeePolicy('standard');
+    }
+
+    if (editingCategory) {
+      setNewCatIsMenuCategory(editingCategory.is_menu_category || false);
+      setNewCatCourses(editingCategory.courses || []);
+      setNewCatScheduleDays(editingCategory.menu_schedule?.days || []);
+      setNewCatScheduleFrom(editingCategory.menu_schedule?.fromTime || '');
+      setNewCatScheduleTo(editingCategory.menu_schedule?.toTime || '');
+    } else {
+      setNewCatIsMenuCategory(false);
+      setNewCatCourses([]);
+      setNewCatScheduleDays([]);
+      setNewCatScheduleFrom('');
+      setNewCatScheduleTo('');
     }
   }, [editingItem, editingCategory]);
 
@@ -2010,18 +2125,42 @@ export default function App() {
 
     // Deduct stock if inventory matches
     const updatedInventory = db.inventory.map((inv: any) => {
-      // Very simple recipe deduction logic for demo:
-      // Pizzas deduct 1 dough, 1 sauce, 1 cheese
-      // Pastas deduct pasta
       let quantityToDeduct = 0;
       cart.forEach(cartItem => {
-        const menuItem = db.items.find((i: any) => i.id === cartItem.item_id);
-        if (menuItem) {
-          if (menuItem.category_id === 1 && inv.id <= 3) { // Pizza ingredients
-            quantityToDeduct += cartItem.quantity * 1;
+        if (cartItem.custom_modifications?.is_menu_order && cartItem.custom_modifications.selected_courses) {
+          cartItem.custom_modifications.selected_courses.forEach(choice => {
+            if (choice.itemId && choice.ingredients) {
+              const ingMatch = choice.ingredients.find(ing => ing.ingredientId === inv.id);
+              if (ingMatch) {
+                quantityToDeduct += cartItem.quantity * ingMatch.quantity;
+              }
+            }
+          });
+        } else {
+          const menuItem = db.items.find((i: any) => i.id === cartItem.item_id);
+          if (menuItem && menuItem.ingredients) {
+            const ingMatch = menuItem.ingredients.find((ing: any) => ing.ingredientId === inv.id);
+            if (ingMatch) {
+              let factor = 1;
+              if (cartItem.custom_modifications?.portion === 'half') {
+                factor = 0.5;
+              }
+              const adj = cartItem.custom_modifications?.ingredient_adjustments?.[inv.id];
+              if (adj === 'none') {
+                factor = 0;
+              } else if (adj === 'double') {
+                factor *= 2;
+              }
+              quantityToDeduct += cartItem.quantity * ingMatch.quantity * factor;
+            }
           }
-          if (menuItem.category_id === 2 && inv.id === 6) { // Pasta
-            quantityToDeduct += cartItem.quantity * 1;
+          if (menuItem && (!menuItem.ingredients || menuItem.ingredients.length === 0)) {
+            if (menuItem.category_id === 1 && inv.id <= 3) { // Pizza ingredients
+              quantityToDeduct += cartItem.quantity * 1;
+            }
+            if (menuItem.category_id === 2 && inv.id === 6) { // Pasta
+              quantityToDeduct += cartItem.quantity * 1;
+            }
           }
         }
       });
@@ -3780,11 +3919,20 @@ export default function App() {
                     Étlap Kategóriák
                   </h2>
                   <div className="cards-grid" key="categories-view">
-                    {db.categories.filter((cat: Category) => cat.is_active !== false).map((cat: Category) => (
+                    {db.categories.filter((cat: Category) => isCategoryVisible(cat)).map((cat: Category) => (
                       <div 
                         key={cat.id} 
                         className="category-card"
-                        onClick={() => setSelectedCategoryId(cat.id)}
+                        onClick={() => {
+                          if (cat.is_menu_category) {
+                            setWizardCategory(cat);
+                            setWizardCourseIndex(0);
+                            setWizardChoices([]);
+                            setShowMenuWizardModal(true);
+                          } else {
+                            setSelectedCategoryId(cat.id);
+                          }
+                        }}
                       >
                         <span className="category-name">{cat.name}</span>
                       </div>
@@ -3875,12 +4023,17 @@ export default function App() {
                   <div className="cart-items">
                     {cart.map((item: OrderItem) => {
                       const itemPrice = item.custom_modifications ? item.custom_modifications.calculated_price : item.price_at_order;
+                      const isMenu = !!item.custom_modifications?.is_menu_order;
                       return (
                         <div 
                           key={item.item_id} 
                           className="cart-item" 
-                          style={{ cursor: 'pointer' }}
-                          onClick={() => handleEditCartItemClick(item)}
+                          style={{ cursor: isMenu ? 'default' : 'pointer' }}
+                          onClick={() => {
+                            if (!isMenu) {
+                              handleEditCartItemClick(item);
+                            }
+                          }}
                         >
                           <div className="cart-item-info">
                             <span className="cart-item-qty">{item.quantity}x</span>
@@ -3888,10 +4041,19 @@ export default function App() {
                               <span className="cart-item-name" title={item.name}>{item.name}</span>
                               {item.custom_modifications && (
                                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '1px', marginTop: '2px' }}>
-                                  {item.custom_modifications.portion === 'half' && (
+                                  {isMenu && item.custom_modifications.selected_courses && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', marginTop: '2px', paddingLeft: '6px', borderLeft: '2px solid var(--primary)' }}>
+                                      {item.custom_modifications.selected_courses.map((choice, cidx) => (
+                                        <span key={cidx} style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
+                                          {choice.courseName}: <strong>{choice.itemName}</strong>
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {!isMenu && item.custom_modifications.portion === 'half' && (
                                     <span style={{ color: '#ff9f0a' }}>🔸 Fél adag (70%)</span>
                                   )}
-                                  {Object.keys(item.custom_modifications.ingredient_adjustments).map(key => {
+                                  {!isMenu && Object.keys(item.custom_modifications.ingredient_adjustments).map(key => {
                                     const ingId = Number(key);
                                     const adj = item.custom_modifications!.ingredient_adjustments[ingId];
                                     if (adj === 'normal') return null;
@@ -3903,10 +4065,10 @@ export default function App() {
                                       </span>
                                     );
                                   })}
-                                  {item.custom_modifications.note && (
+                                  {!isMenu && item.custom_modifications.note && (
                                     <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>💬 "{item.custom_modifications.note}"</span>
                                   )}
-                                  {item.custom_modifications.linked_item && (
+                                  {!isMenu && item.custom_modifications.linked_item && (
                                     <span style={{ color: '#0a84ff', fontWeight: 600 }}>
                                       ➕ Csatolmány: {item.custom_modifications.linked_item.name} (+{item.custom_modifications.linked_item.price_at_order.toLocaleString()} FT)
                                     </span>
@@ -4976,46 +5138,405 @@ export default function App() {
                             />
                           </div>
 
-                          <div>
-                            <label className="input-label">Csatolt Kategória (opcionális)</label>
-                            <AppleSelect
-                              value={newCatLinkedCategoryId}
-                              onChange={val => setNewCatLinkedCategoryId(val === 'none' ? 'none' : Number(val))}
-                              options={[
-                                { value: 'none', label: 'Nincs csatolt kategória' },
-                                ...db.categories
-                                  .filter((c: any) => c.id !== editingCategory.id)
-                                  .map((c: any) => ({ value: c.id, label: c.name }))
-                              ]}
-                              icon={<Layers size={12} />}
-                              isOpen={openCatLinkDropdown}
-                              onToggle={() => setOpenCatLinkDropdown(!openCatLinkDropdown)}
-                              onClose={() => setOpenCatLinkDropdown(false)}
-                              openUpward={true}
-                            />
+                          {/* CATEGORY TYPE: NORMAL VS MENU */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0' }}>
+                            <label className="input-label" style={{ margin: 0 }}>Menüs Kategória?</label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', userSelect: 'none' }}>
+                              <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                                {newCatIsMenuCategory ? 'Igen (Menü)' : 'Nem (Sima)'}
+                              </span>
+                              <div 
+                                onClick={() => {
+                                  if (newCatLinkedCategoryId !== 'none') {
+                                    alert('Csatolt kategóriával rendelkező kategória nem lehet Menüs kategória! Távolítsd el a csatolt kategóriát először.');
+                                    return;
+                                  }
+                                  setNewCatIsMenuCategory(!newCatIsMenuCategory);
+                                }}
+                                style={{
+                                  width: '36px',
+                                  height: '20px',
+                                  borderRadius: '10px',
+                                  background: newCatIsMenuCategory ? '#30d158' : '#ff453a',
+                                  position: 'relative',
+                                  cursor: 'pointer',
+                                  transition: 'background-color 0.2s ease',
+                                  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)'
+                                }}
+                              >
+                                <div 
+                                  style={{
+                                    width: '16px',
+                                    height: '16px',
+                                    borderRadius: '50%',
+                                    background: 'white',
+                                    position: 'absolute',
+                                    top: '2px',
+                                    left: newCatIsMenuCategory ? '18px' : '2px',
+                                    transition: 'left 0.2s ease',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
+                                  }}
+                                />
+                              </div>
+                            </div>
                           </div>
 
-                          {newCatLinkedCategoryId !== 'none' && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
-                              <input 
-                                type="checkbox" 
-                                id="newCatIncludeLinkedPackagingFee"
-                                checked={newCatIncludeLinkedPackagingFee}
-                                onChange={e => setNewCatIncludeLinkedPackagingFee(e.target.checked)}
-                                style={{
-                                  width: '18px',
-                                  height: '18px',
-                                  accentColor: '#bf5af2',
-                                  cursor: 'pointer'
-                                }}
-                              />
-                              <label 
-                                htmlFor="newCatIncludeLinkedPackagingFee" 
-                                style={{ fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}
-                              >
-                                Csatolt csomagolási díj felszámítása
-                              </label>
-                            </div>
+                          {!newCatIsMenuCategory && (
+                            <>
+                              <div>
+                                <label className="input-label">Csatolt Kategória (opcionális)</label>
+                                <AppleSelect
+                                  value={newCatLinkedCategoryId}
+                                  onChange={val => setNewCatLinkedCategoryId(val === 'none' ? 'none' : Number(val))}
+                                  options={[
+                                    { value: 'none', label: 'Nincs csatolt kategória' },
+                                    ...db.categories
+                                      .filter((c: any) => c.id !== editingCategory.id)
+                                      .map((c: any) => ({ value: c.id, label: c.name }))
+                                  ]}
+                                  icon={<Layers size={12} />}
+                                  isOpen={openCatLinkDropdown}
+                                  onToggle={() => setOpenCatLinkDropdown(!openCatLinkDropdown)}
+                                  onClose={() => setOpenCatLinkDropdown(false)}
+                                  openUpward={true}
+                                />
+                              </div>
+
+                              {newCatLinkedCategoryId !== 'none' && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
+                                  <input 
+                                    type="checkbox" 
+                                    id="newCatIncludeLinkedPackagingFee"
+                                    checked={newCatIncludeLinkedPackagingFee}
+                                    onChange={e => setNewCatIncludeLinkedPackagingFee(e.target.checked)}
+                                    style={{
+                                      width: '18px',
+                                      height: '18px',
+                                      accentColor: '#bf5af2',
+                                      cursor: 'pointer'
+                                    }}
+                                  />
+                                  <label 
+                                    htmlFor="newCatIncludeLinkedPackagingFee" 
+                                    style={{ fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}
+                                  >
+                                    Csatolt csomagolási díj felszámítása
+                                  </label>
+                                </div>
+                              )}
+                            </>
+                          )}
+
+                          {newCatIsMenuCategory && (
+                            <>
+                              {/* MENU AVAILABILITY SCHEDULE */}
+                              <div style={{
+                                border: '1px solid rgba(255,255,255,0.08)',
+                                borderRadius: '10px',
+                                padding: '12px',
+                                background: 'rgba(255,255,255,0.01)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '10px'
+                              }}>
+                                <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)' }}>
+                                  Menü Elérhetőségi Ideje
+                                </span>
+
+                                <div>
+                                  <label className="input-label" style={{ fontSize: '11px', marginBottom: '6px' }}>Napok</label>
+                                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                    {[
+                                      { val: 1, label: 'H' },
+                                      { val: 2, label: 'K' },
+                                      { val: 3, label: 'Sze' },
+                                      { val: 4, label: 'Cs' },
+                                      { val: 5, label: 'P' },
+                                      { val: 6, label: 'Szo' },
+                                      { val: 7, label: 'V' }
+                                    ].map(day => {
+                                      const isSelected = newCatScheduleDays.includes(day.val);
+                                      return (
+                                        <button
+                                          key={day.val}
+                                          type="button"
+                                          onClick={() => {
+                                            if (isSelected) {
+                                              setNewCatScheduleDays(newCatScheduleDays.filter(d => d !== day.val));
+                                            } else {
+                                              setNewCatScheduleDays([...newCatScheduleDays, day.val].sort());
+                                            }
+                                          }}
+                                          style={{
+                                            width: '30px',
+                                            height: '30px',
+                                            borderRadius: '6px',
+                                            border: '1px solid rgba(255,255,255,0.08)',
+                                            background: isSelected ? 'var(--primary)' : 'rgba(0,0,0,0.2)',
+                                            color: 'white',
+                                            fontSize: '11px',
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                            transition: 'all 0.15s ease'
+                                          }}
+                                        >
+                                          {day.label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                  <div>
+                                    <label className="input-label" style={{ fontSize: '11px' }}>Ettől</label>
+                                    <input 
+                                      type="time" 
+                                      className="input-field" 
+                                      style={{ height: '32px', fontSize: '12px' }}
+                                      value={newCatScheduleFrom}
+                                      onChange={e => setNewCatScheduleFrom(e.target.value)}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="input-label" style={{ fontSize: '11px' }}>Eddig</label>
+                                    <input 
+                                      type="time" 
+                                      className="input-field" 
+                                      style={{ height: '32px', fontSize: '12px' }}
+                                      value={newCatScheduleTo}
+                                      onChange={e => setNewCatScheduleTo(e.target.value)}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* COURSES EDITOR PANEL */}
+                              <div style={{
+                                border: '1px solid rgba(255,255,255,0.08)',
+                                borderRadius: '10px',
+                                padding: '12px',
+                                background: 'rgba(255,255,255,0.01)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '12px'
+                              }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)' }}>
+                                    Fogások Konfigurációja
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="btn"
+                                    style={{ padding: '4px 10px', fontSize: '11px', background: 'var(--primary)', color: 'white' }}
+                                    onClick={() => {
+                                      const nextId = newCatCourses.length > 0 ? Math.max(...newCatCourses.map(c => c.id)) + 1 : 1;
+                                      setNewCatCourses([...newCatCourses, {
+                                        id: nextId,
+                                        name: `${newCatCourses.length + 1}. Fogás`,
+                                        sourceType: 'individual',
+                                        itemIds: [],
+                                        itemOverrides: {}
+                                      }]);
+                                    }}
+                                  >
+                                    + Új Fogás
+                                  </button>
+                                </div>
+
+                                {newCatCourses.length === 0 ? (
+                                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center', padding: '10px 0' }}>
+                                    Még nincsenek fogások hozzáadva.
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '300px', overflowY: 'auto' }}>
+                                    {newCatCourses.map((course) => {
+                                      let courseItems: MenuItem[] = [];
+                                      if (course.sourceType === 'category' && course.sourceCategoryId) {
+                                        courseItems = db.items.filter((i: any) => i.category_id === course.sourceCategoryId && i.is_active !== false);
+                                      } else if (course.sourceType === 'individual' && course.itemIds) {
+                                        courseItems = db.items.filter((i: any) => course.itemIds?.includes(i.id) && i.is_active !== false);
+                                      }
+
+                                      return (
+                                        <div key={course.id} style={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '10px', background: 'rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <input 
+                                              type="text"
+                                              className="input-field"
+                                              style={{ height: '28px', width: '60%', fontSize: '12px', fontWeight: 'bold' }}
+                                              value={course.name}
+                                              onChange={e => {
+                                                const val = e.target.value;
+                                                setNewCatCourses(newCatCourses.map(c => c.id === course.id ? { ...c, name: val } : c));
+                                              }}
+                                            />
+                                            <button
+                                              type="button"
+                                              className="btn btn-danger"
+                                              style={{ padding: '3px 8px', fontSize: '10px' }}
+                                              onClick={() => {
+                                                setNewCatCourses(newCatCourses.filter(c => c.id !== course.id));
+                                              }}
+                                            >
+                                              Töröl
+                                            </button>
+                                          </div>
+
+                                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                            <div>
+                                              <label style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Forrás típusa</label>
+                                              <select
+                                                className="input-field"
+                                                style={{ height: '28px', fontSize: '11px', padding: '0 4px', background: 'rgba(0,0,0,0.4)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px' }}
+                                                value={course.sourceType}
+                                                onChange={e => {
+                                                  const type = e.target.value as 'category' | 'individual';
+                                                  setNewCatCourses(newCatCourses.map(c => c.id === course.id ? { ...c, sourceType: type, sourceCategoryId: null, itemIds: [], itemOverrides: {} } : c));
+                                                }}
+                                              >
+                                                <option value="individual">Egyedi ételek</option>
+                                                <option value="category">Teljes kategória</option>
+                                              </select>
+                                            </div>
+
+                                            {course.sourceType === 'category' ? (
+                                              <div>
+                                                <label style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Kategória</label>
+                                                <select
+                                                  className="input-field"
+                                                  style={{ height: '28px', fontSize: '11px', padding: '0 4px', background: 'rgba(0,0,0,0.4)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px' }}
+                                                  value={course.sourceCategoryId || ''}
+                                                  onChange={e => {
+                                                    const catId = Number(e.target.value) || null;
+                                                    setNewCatCourses(newCatCourses.map(c => c.id === course.id ? { ...c, sourceCategoryId: catId, itemOverrides: {} } : c));
+                                                  }}
+                                                >
+                                                  <option value="">-- Válassz --</option>
+                                                  {db.categories.filter((c: any) => c.id !== editingCategory.id && !c.is_menu_category).map((c: any) => (
+                                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                                  ))}
+                                                </select>
+                                              </div>
+                                            ) : (
+                                              <div>
+                                                <label style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Ételek</label>
+                                                <div style={{ maxHeight: '80px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.08)', padding: '4px', borderRadius: '4px', background: 'rgba(0,0,0,0.3)' }}>
+                                                  {db.items.map((item: any) => {
+                                                    const isChecked = course.itemIds?.includes(item.id);
+                                                    return (
+                                                      <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', cursor: 'pointer', color: 'white', margin: '2px 0' }}>
+                                                        <input 
+                                                          type="checkbox"
+                                                          checked={isChecked}
+                                                          onChange={() => {
+                                                            const updatedIds = isChecked 
+                                                              ? (course.itemIds || []).filter(id => id !== item.id)
+                                                              : [...(course.itemIds || []), item.id];
+                                                            
+                                                            const updatedOverrides = { ...(course.itemOverrides || {}) };
+                                                            if (isChecked) {
+                                                              delete updatedOverrides[item.id];
+                                                            }
+
+                                                            setNewCatCourses(newCatCourses.map(c => c.id === course.id ? { ...c, itemIds: updatedIds, itemOverrides: updatedOverrides } : c));
+                                                          }}
+                                                        />
+                                                        {item.name}
+                                                      </label>
+                                                    );
+                                                  })}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+
+                                          {courseItems.length > 0 && (
+                                            <div style={{ marginTop: '4px', borderTop: '1px dashed rgba(255,255,255,0.06)', paddingTop: '6px' }}>
+                                              <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--primary)' }}>
+                                                Ételek felülírásai:
+                                              </span>
+                                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
+                                                {courseItems.map((item) => {
+                                                  const override = course.itemOverrides?.[item.id] || { price: item.price, ingredients: item.ingredients || [] };
+                                                  
+                                                  return (
+                                                    <div key={item.id} style={{ padding: '6px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '4px' }}>
+                                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'white' }}>{item.name}</span>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                          <label style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Ár:</label>
+                                                          <input 
+                                                            type="number"
+                                                            className="input-field"
+                                                            style={{ height: '24px', width: '60px', fontSize: '11px' }}
+                                                            value={override.price}
+                                                            onChange={e => {
+                                                              const price = parseInt(e.target.value) || 0;
+                                                              const updatedOverrides = {
+                                                                ...(course.itemOverrides || {}),
+                                                                [item.id]: {
+                                                                  ...override,
+                                                                  price
+                                                                }
+                                                              };
+                                                              setNewCatCourses(newCatCourses.map(c => c.id === course.id ? { ...c, itemOverrides: updatedOverrides } : c));
+                                                            }}
+                                                          />
+                                                        </div>
+                                                      </div>
+
+                                                      {override.ingredients && override.ingredients.length > 0 && (
+                                                        <div style={{ marginTop: '4px', paddingLeft: '8px', borderLeft: '1px solid rgba(255,255,255,0.1)' }}>
+                                                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                                                            {override.ingredients.map((ing, ingIdx) => {
+                                                              const inv = db.inventory.find((i: any) => i.id === ing.ingredientId);
+                                                              return (
+                                                                <div key={ing.ingredientId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
+                                                                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                                                                    {inv ? inv.name : `Alapanyag #${ing.ingredientId}`}
+                                                                  </span>
+                                                                  <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                                                    <input 
+                                                                      type="number"
+                                                                      className="input-field"
+                                                                      style={{ height: '20px', width: '45px', fontSize: '10px', padding: '2px' }}
+                                                                      step="any"
+                                                                      value={ing.quantity}
+                                                                      onChange={e => {
+                                                                        const qty = parseFloat(e.target.value) || 0;
+                                                                        const updatedIngs = override.ingredients.map((ig, igx) => igx === ingIdx ? { ...ig, quantity: qty } : ig);
+                                                                        const updatedOverrides = {
+                                                                          ...(course.itemOverrides || {}),
+                                                                          [item.id]: {
+                                                                            ...override,
+                                                                            ingredients: updatedIngs
+                                                                          }
+                                                                        };
+                                                                        setNewCatCourses(newCatCourses.map(c => c.id === course.id ? { ...c, itemOverrides: updatedOverrides } : c));
+                                                                      }}
+                                                                    />
+                                                                    <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{inv?.unit || ''}</span>
+                                                                  </div>
+                                                                </div>
+                                                              );
+                                                            })}
+                                                          </div>
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            </>
                           )}
 
                           {/* TIMED PROMOTION CONFIGURATION CARD */}
@@ -5251,6 +5772,12 @@ export default function App() {
                                   packagingFeePolicy: promoPackagingFeePolicy
                                 };
 
+                                const menuSched: MenuSchedule | undefined = newCatIsMenuCategory ? {
+                                  days: newCatScheduleDays,
+                                  fromTime: newCatScheduleFrom || undefined,
+                                  toTime: newCatScheduleTo || undefined
+                                } : undefined;
+
                                 let updated = [...db.categories];
                                 if (editingCategory.id === 0) {
                                   const newId = db.categories.length > 0 ? Math.max(...db.categories.map((c: any) => c.id)) + 1 : 1;
@@ -5259,18 +5786,24 @@ export default function App() {
                                     name: nameTrimmed,
                                     description: newCatDescription.trim(),
                                     is_active: true,
-                                    linked_category_id: newCatLinkedCategoryId === 'none' ? null : newCatLinkedCategoryId,
-                                    include_linked_packaging_fee: newCatLinkedCategoryId === 'none' ? false : newCatIncludeLinkedPackagingFee,
-                                    promotion: promoObj
+                                    linked_category_id: newCatIsMenuCategory ? null : (newCatLinkedCategoryId === 'none' ? null : newCatLinkedCategoryId),
+                                    include_linked_packaging_fee: newCatIsMenuCategory ? false : (newCatLinkedCategoryId === 'none' ? false : newCatIncludeLinkedPackagingFee),
+                                    promotion: promoObj,
+                                    is_menu_category: newCatIsMenuCategory,
+                                    courses: newCatIsMenuCategory ? newCatCourses : undefined,
+                                    menu_schedule: menuSched
                                   });
                                 } else {
                                   updated = db.categories.map((c: any) => c.id === editingCategory.id ? {
                                     ...c,
                                     name: nameTrimmed,
                                     description: newCatDescription.trim(),
-                                    linked_category_id: newCatLinkedCategoryId === 'none' ? null : newCatLinkedCategoryId,
-                                    include_linked_packaging_fee: newCatLinkedCategoryId === 'none' ? false : newCatIncludeLinkedPackagingFee,
-                                    promotion: promoObj
+                                    linked_category_id: newCatIsMenuCategory ? null : (newCatLinkedCategoryId === 'none' ? null : newCatLinkedCategoryId),
+                                    include_linked_packaging_fee: newCatIsMenuCategory ? false : (newCatLinkedCategoryId === 'none' ? false : newCatIncludeLinkedPackagingFee),
+                                    promotion: promoObj,
+                                    is_menu_category: newCatIsMenuCategory,
+                                    courses: newCatIsMenuCategory ? newCatCourses : undefined,
+                                    menu_schedule: menuSched
                                   } : c);
                                 }
 
@@ -9089,6 +9622,222 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* ================= MODAL: MENÜ VÁLASZTÓ VARÁZSLÓ ================= */}
+      {showMenuWizardModal && wizardCategory && (() => {
+        const courses = wizardCategory.courses || [];
+        const currentCourse = courses[wizardCourseIndex];
+        
+        const handleChoice = (itemId: number | null) => {
+          let choice: MenuCourseChoice;
+          if (itemId === null) {
+            choice = {
+              courseId: currentCourse.id,
+              courseName: currentCourse.name,
+              itemId: null,
+              itemName: 'Nem kér',
+              price: 0,
+              packagingFee: 0,
+              ingredients: []
+            };
+          } else {
+            const item = db.items.find((i: any) => i.id === itemId);
+            if (!item) return;
+
+            const overrides = currentCourse.itemOverrides?.[itemId];
+            const pricing = getItemCurrentPricing(item, db.categories);
+
+            const finalPrice = overrides ? overrides.price : pricing.price;
+            const finalPackFee = pricing.packagingFee;
+
+            const finalIngredients = overrides && overrides.ingredients 
+              ? overrides.ingredients 
+              : (item.ingredients || []);
+
+            choice = {
+              courseId: currentCourse.id,
+              courseName: currentCourse.name,
+              itemId: item.id,
+              itemName: item.name,
+              price: finalPrice,
+              packagingFee: finalPackFee,
+              ingredients: finalIngredients
+            };
+          }
+
+          const updatedChoices = [...wizardChoices, choice];
+          
+          if (wizardCourseIndex + 1 < courses.length) {
+            setWizardChoices(updatedChoices);
+            setWizardCourseIndex(wizardCourseIndex + 1);
+          } else {
+            const totalPrice = updatedChoices.reduce((acc, c) => acc + c.price, 0);
+            const totalPackaging = updatedChoices.reduce((acc, c) => acc + c.packagingFee, 0);
+
+            const menuCartItem: OrderItem = {
+              item_id: -wizardCategory.id,
+              name: `${wizardCategory.name}`,
+              quantity: 1,
+              price_at_order: totalPrice,
+              packaging_fee_at_order: totalPackaging,
+              custom_modifications: {
+                portion: 'full',
+                ingredient_adjustments: {},
+                note: '',
+                extra_price: 0,
+                calculated_price: totalPrice,
+                is_menu_order: true,
+                selected_courses: updatedChoices
+              }
+            };
+
+            setCart(prev => [...prev, menuCartItem]);
+            setShowMenuWizardModal(false);
+            setWizardCategory(null);
+          }
+        };
+
+        if (courses.length === 0) {
+          return (
+            <div className="modal-overlay" onClick={() => { setShowMenuWizardModal(false); setWizardCategory(null); }}>
+              <div className="modal-card" style={{ maxWidth: '400px', background: 'var(--panel-bg)', border: '1px solid var(--glass-border)', padding: '20px' }} onClick={e => e.stopPropagation()}>
+                <div className="modal-header" style={{ marginBottom: '14px' }}>
+                  <span className="modal-title">{wizardCategory.name}</span>
+                </div>
+                <div className="modal-body" style={{ color: 'var(--text-secondary)', fontSize: '13px', textAlign: 'center', padding: '10px 0' }}>
+                  Ehhez a menüs kategóriához még nincsenek fogások beállítva.
+                </div>
+                <div className="modal-footer" style={{ marginTop: '14px', display: 'flex', justifyContent: 'flex-end' }}>
+                  <button className="btn" onClick={() => { setShowMenuWizardModal(false); setWizardCategory(null); }}>Bezárás</button>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        let courseItems: MenuItem[] = [];
+        if (currentCourse.sourceType === 'category' && currentCourse.sourceCategoryId) {
+          courseItems = db.items.filter((i: any) => i.category_id === currentCourse.sourceCategoryId && i.is_active !== false);
+        } else if (currentCourse.sourceType === 'individual' && currentCourse.itemIds) {
+          courseItems = db.items.filter((i: any) => currentCourse.itemIds?.includes(i.id) && i.is_active !== false);
+        }
+
+        return (
+          <div className="modal-overlay" onClick={() => { setShowMenuWizardModal(false); setWizardCategory(null); }}>
+            <div className="modal-card" style={{ maxWidth: '700px', width: '90%', background: 'var(--panel-bg)', border: '1px solid var(--glass-border)', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }} onClick={e => e.stopPropagation()}>
+              <div className="modal-header" style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span className="modal-title" style={{ fontSize: '15px', fontWeight: 700 }}>
+                  {wizardCategory.name} választása ({wizardCourseIndex + 1} / {courses.length} Fogás)
+                </span>
+                <button className="island-close-btn" style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }} onClick={() => { setShowMenuWizardModal(false); setWizardCategory(null); }}>
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <h3 style={{ margin: 0, fontSize: '14px', color: 'var(--primary)', fontWeight: 700 }}>
+                  Aktuális fogás: {currentCourse.name}
+                </h3>
+                
+                <div style={{ display: 'flex', gap: '6px', margin: '4px 0 10px 0' }}>
+                  {courses.map((c, idx) => (
+                    <div 
+                      key={c.id} 
+                      style={{
+                        flex: 1,
+                        height: '4px',
+                        borderRadius: '2px',
+                        background: idx === wizardCourseIndex ? 'var(--primary)' : (idx < wizardCourseIndex ? 'var(--success)' : 'rgba(255,255,255,0.1)')
+                      }}
+                    />
+                  ))}
+                </div>
+
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                  gap: '12px',
+                  maxHeight: '45vh',
+                  overflowY: 'auto',
+                  padding: '4px'
+                }}>
+                  <div 
+                    onClick={() => handleChoice(null)}
+                    style={{
+                      background: 'rgba(255,255,255,0.02)',
+                      border: '1px dashed rgba(255,69,58,0.4)',
+                      borderRadius: '10px',
+                      padding: '14px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      minHeight: '90px',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <span style={{ fontSize: '14px', fontWeight: 700, color: '#ff453a' }}>Nem kér</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Fogás kihagyása</span>
+                  </div>
+
+                  {courseItems.map((item) => {
+                    const overrides = currentCourse.itemOverrides?.[item.id];
+                    const pricing = getItemCurrentPricing(item, db.categories);
+                    const finalPrice = overrides ? overrides.price : pricing.price;
+
+                    return (
+                      <div 
+                        key={item.id}
+                        onClick={() => handleChoice(item.id)}
+                        style={{
+                          background: 'rgba(255,255,255,0.02)',
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          borderRadius: '10px',
+                          padding: '14px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          minHeight: '90px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{item.name}</span>
+                        <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--primary)' }}>
+                            {finalPrice.toLocaleString()} FT
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="modal-footer" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <button 
+                  className="btn" 
+                  onClick={() => {
+                    if (wizardCourseIndex > 0) {
+                      setWizardCourseIndex(wizardCourseIndex - 1);
+                      setWizardChoices(prev => prev.slice(0, -1));
+                    } else {
+                      setShowMenuWizardModal(false);
+                      setWizardCategory(null);
+                    }
+                  }}
+                >
+                  {wizardCourseIndex > 0 ? 'Vissza' : 'Mégse'}
+                </button>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                  Eddigi részösszeg: {wizardChoices.reduce((acc, c) => acc + c.price, 0).toLocaleString()} FT
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ================= MODAL: MAI RENDELÉSEK ELŐZMÉNYEI ================= */}
       {showTodayOrdersModal && (
