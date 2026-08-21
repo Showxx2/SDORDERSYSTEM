@@ -5106,8 +5106,8 @@ export default function App() {
                   {/* Add / Edit Category Modal Overlay */}
                   {editingCategory && (
                     <div className="modal-overlay" onClick={() => setEditingCategory(null)}>
-                      <div className="modal-card" style={{ maxWidth: '450px', background: 'var(--panel-bg)', border: '1px solid var(--glass-border)', padding: '20px', display: 'block' }} onClick={e => e.stopPropagation()}>
-                        <div className="modal-header" style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                      <div className="modal-card" style={{ maxWidth: newCatIsMenuCategory ? '950px' : '480px', width: '95%', maxHeight: '90vh', background: 'var(--panel-bg)', border: '1px solid var(--glass-border)', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', transition: 'max-width 0.25s ease' }} onClick={e => e.stopPropagation()}>
+                        <div className="modal-header" style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span className="modal-title" style={{ fontSize: '15px', fontWeight: 700 }}>
                             {editingCategory.id === 0 ? 'Új kategória hozzáadása' : 'Kategória szerkesztése'}
                           </span>
@@ -5116,120 +5116,130 @@ export default function App() {
                           </button>
                         </div>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          <div>
-                            <label className="input-label">Kategória név</label>
-                            <input 
-                              type="text" 
-                              className="input-field" 
-                              value={newCatName}
-                              onChange={e => setNewCatName(e.target.value)}
-                              placeholder="pl: Levesek, Italok"
-                            />
-                          </div>
-                          <div>
-                            <label className="input-label">Leírás</label>
-                            <input 
-                              type="text" 
-                              className="input-field" 
-                              value={newCatDescription}
-                              onChange={e => setNewCatDescription(e.target.value)}
-                              placeholder="pl: Finom meleg leveseink..."
-                            />
-                          </div>
-
-                          {/* CATEGORY TYPE: NORMAL VS MENU */}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0' }}>
-                            <label className="input-label" style={{ margin: 0 }}>Menüs Kategória?</label>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', userSelect: 'none' }}>
-                              <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                                {newCatIsMenuCategory ? 'Igen (Menü)' : 'Nem (Sima)'}
-                              </span>
-                              <div 
-                                onClick={() => {
-                                  if (newCatLinkedCategoryId !== 'none') {
-                                    alert('Csatolt kategóriával rendelkező kategória nem lehet Menüs kategória! Távolítsd el a csatolt kategóriát először.');
-                                    return;
-                                  }
-                                  setNewCatIsMenuCategory(!newCatIsMenuCategory);
-                                }}
-                                style={{
-                                  width: '36px',
-                                  height: '20px',
-                                  borderRadius: '10px',
-                                  background: newCatIsMenuCategory ? '#30d158' : '#ff453a',
-                                  position: 'relative',
-                                  cursor: 'pointer',
-                                  transition: 'background-color 0.2s ease',
-                                  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)'
-                                }}
-                              >
-                                <div 
-                                  style={{
-                                    width: '16px',
-                                    height: '16px',
-                                    borderRadius: '50%',
-                                    background: 'white',
-                                    position: 'absolute',
-                                    top: '2px',
-                                    left: newCatIsMenuCategory ? '18px' : '2px',
-                                    transition: 'left 0.2s ease',
-                                    boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
-                                  }}
-                                />
-                              </div>
+                        {/* Modal Scrollable Body */}
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: newCatIsMenuCategory ? '1.2fr 1.8fr' : '1fr',
+                          gap: '20px',
+                          flex: 1,
+                          minHeight: 0,
+                          overflowY: 'hidden',
+                          transition: 'grid-template-columns 0.25s ease'
+                        }}>
+                          {/* Column 1: General Info, Schedule & Promotions */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', paddingRight: newCatIsMenuCategory ? '10px' : '0' }}>
+                            <div>
+                              <label className="input-label">Kategória név</label>
+                              <input 
+                                type="text" 
+                                className="input-field" 
+                                value={newCatName}
+                                onChange={e => setNewCatName(e.target.value)}
+                                placeholder="pl: Levesek, Italok"
+                              />
                             </div>
-                          </div>
+                            <div>
+                              <label className="input-label">Leírás</label>
+                              <input 
+                                type="text" 
+                                className="input-field" 
+                                value={newCatDescription}
+                                onChange={e => setNewCatDescription(e.target.value)}
+                                placeholder="pl: Finom meleg leveseink..."
+                              />
+                            </div>
 
-                          {!newCatIsMenuCategory && (
-                            <>
-                              <div>
-                                <label className="input-label">Csatolt Kategória (opcionális)</label>
-                                <AppleSelect
-                                  value={newCatLinkedCategoryId}
-                                  onChange={val => setNewCatLinkedCategoryId(val === 'none' ? 'none' : Number(val))}
-                                  options={[
-                                    { value: 'none', label: 'Nincs csatolt kategória' },
-                                    ...db.categories
-                                      .filter((c: any) => c.id !== editingCategory.id)
-                                      .map((c: any) => ({ value: c.id, label: c.name }))
-                                  ]}
-                                  icon={<Layers size={12} />}
-                                  isOpen={openCatLinkDropdown}
-                                  onToggle={() => setOpenCatLinkDropdown(!openCatLinkDropdown)}
-                                  onClose={() => setOpenCatLinkDropdown(false)}
-                                  openUpward={true}
-                                />
-                              </div>
-
-                              {newCatLinkedCategoryId !== 'none' && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
-                                  <input 
-                                    type="checkbox" 
-                                    id="newCatIncludeLinkedPackagingFee"
-                                    checked={newCatIncludeLinkedPackagingFee}
-                                    onChange={e => setNewCatIncludeLinkedPackagingFee(e.target.checked)}
+                            {/* CATEGORY TYPE: NORMAL VS MENU */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0' }}>
+                              <label className="input-label" style={{ margin: 0 }}>Menüs Kategória?</label>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', userSelect: 'none' }}>
+                                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                                  {newCatIsMenuCategory ? 'Igen (Menü)' : 'Nem (Sima)'}
+                                </span>
+                                <div 
+                                  onClick={() => {
+                                    if (newCatLinkedCategoryId !== 'none') {
+                                      alert('Csatolt kategóriával rendelkező kategória nem lehet Menüs kategória! Távolítsd el a csatolt kategóriát először.');
+                                      return;
+                                    }
+                                    setNewCatIsMenuCategory(!newCatIsMenuCategory);
+                                  }}
+                                  style={{
+                                    width: '36px',
+                                    height: '20px',
+                                    borderRadius: '10px',
+                                    background: newCatIsMenuCategory ? '#30d158' : '#ff453a',
+                                    position: 'relative',
+                                    cursor: 'pointer',
+                                    transition: 'background-color 0.2s ease',
+                                    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)'
+                                  }}
+                                >
+                                  <div 
                                     style={{
-                                      width: '18px',
-                                      height: '18px',
-                                      accentColor: '#bf5af2',
-                                      cursor: 'pointer'
+                                      width: '16px',
+                                      height: '16px',
+                                      borderRadius: '50%',
+                                      background: 'white',
+                                      position: 'absolute',
+                                      top: '2px',
+                                      left: newCatIsMenuCategory ? '18px' : '2px',
+                                      transition: 'left 0.2s ease',
+                                      boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
                                     }}
                                   />
-                                  <label 
-                                    htmlFor="newCatIncludeLinkedPackagingFee" 
-                                    style={{ fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}
-                                  >
-                                    Csatolt csomagolási díj felszámítása
-                                  </label>
                                 </div>
-                              )}
-                            </>
-                          )}
+                              </div>
+                            </div>
 
-                          {newCatIsMenuCategory && (
-                            <>
-                              {/* MENU AVAILABILITY SCHEDULE */}
+                            {!newCatIsMenuCategory && (
+                              <>
+                                <div>
+                                  <label className="input-label">Csatolt Kategória (opcionális)</label>
+                                  <AppleSelect
+                                    value={newCatLinkedCategoryId}
+                                    onChange={val => setNewCatLinkedCategoryId(val === 'none' ? 'none' : Number(val))}
+                                    options={[
+                                      { value: 'none', label: 'Nincs csatolt kategória' },
+                                      ...db.categories
+                                        .filter((c: any) => c.id !== editingCategory.id)
+                                        .map((c: any) => ({ value: c.id, label: c.name }))
+                                    ]}
+                                    icon={<Layers size={12} />}
+                                    isOpen={openCatLinkDropdown}
+                                    onToggle={() => setOpenCatLinkDropdown(!openCatLinkDropdown)}
+                                    onClose={() => setOpenCatLinkDropdown(false)}
+                                    openUpward={true}
+                                  />
+                                </div>
+
+                                {newCatLinkedCategoryId !== 'none' && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
+                                    <input 
+                                      type="checkbox" 
+                                      id="newCatIncludeLinkedPackagingFee"
+                                      checked={newCatIncludeLinkedPackagingFee}
+                                      onChange={e => setNewCatIncludeLinkedPackagingFee(e.target.checked)}
+                                      style={{
+                                        width: '18px',
+                                        height: '18px',
+                                        accentColor: '#bf5af2',
+                                        cursor: 'pointer'
+                                      }}
+                                    />
+                                    <label 
+                                      htmlFor="newCatIncludeLinkedPackagingFee" 
+                                      style={{ fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}
+                                    >
+                                      Csatolt csomagolási díj felszámítása
+                                    </label>
+                                  </div>
+                                )}
+                              </>
+                            )}
+
+                            {newCatIsMenuCategory && (
+                              /* MENU AVAILABILITY SCHEDULE */
                               <div style={{
                                 border: '1px solid rgba(255,255,255,0.08)',
                                 borderRadius: '10px',
@@ -5310,7 +5320,223 @@ export default function App() {
                                   </div>
                                 </div>
                               </div>
+                            )}
 
+                            {/* TIMED PROMOTION CONFIGURATION CARD */}
+                            <div ref={promoPanelRef} style={{
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              borderRadius: '10px',
+                              padding: '14px',
+                              background: 'rgba(255,255,255,0.02)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: '12px'
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)' }}>
+                                  Időzített Árazás & Akciók
+                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', userSelect: 'none' }}>
+                                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                                    {promoIsEnabled ? 'Engedélyezve' : 'Kitiltva'}
+                                  </span>
+                                  <div 
+                                    onClick={() => {
+                                      const nextVal = !promoIsEnabled;
+                                      setPromoIsEnabled(nextVal);
+                                      if (nextVal) {
+                                        setTimeout(() => {
+                                          promoPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                                        }, 80);
+                                      }
+                                    }}
+                                    style={{
+                                      width: '36px',
+                                      height: '20px',
+                                      borderRadius: '10px',
+                                      background: promoIsEnabled ? '#30d158' : '#ff453a',
+                                      position: 'relative',
+                                      cursor: 'pointer',
+                                      transition: 'background-color 0.2s ease',
+                                      boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)'
+                                    }}
+                                  >
+                                    <div 
+                                      style={{
+                                        width: '16px',
+                                        height: '16px',
+                                        borderRadius: '50%',
+                                        background: 'white',
+                                        position: 'absolute',
+                                        top: '2px',
+                                        left: promoIsEnabled ? '18px' : '2px',
+                                        transition: 'left 0.2s ease',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
+                                      }}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              {promoIsEnabled && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px dashed rgba(255,255,255,0.06)', paddingTop: '10px' }}>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                    <div>
+                                      <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Típus</label>
+                                      <AppleSelect
+                                        value={promoType}
+                                        onChange={val => setPromoType(val as 'once' | 'recurring')}
+                                        options={[
+                                          { value: 'once', label: 'Egy alkalommal' },
+                                          { value: 'recurring', label: 'Ismétlődő' }
+                                        ]}
+                                        icon={<Activity size={12} />}
+                                        isOpen={openPromoTypeDropdown}
+                                        onToggle={() => setOpenPromoTypeDropdown(!openPromoTypeDropdown)}
+                                        onClose={() => setOpenPromoTypeDropdown(false)}
+                                      />
+                                    </div>
+
+                                    {promoType === 'once' ? (
+                                      <div>
+                                        <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Dátum</label>
+                                        <input 
+                                          type="date"
+                                          className="input-field"
+                                          style={{ height: '32px', fontSize: '12px' }}
+                                          value={promoOnceDate}
+                                          onChange={e => setPromoOnceDate(e.target.value)}
+                                        />
+                                      </div>
+                                    ) : (
+                                      <div>
+                                        <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Gyakoriság</label>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                          <input 
+                                            type="number"
+                                            className="input-field"
+                                            style={{ height: '32px', fontSize: '12px', width: '60px' }}
+                                            min={1}
+                                            value={promoRecurringWeeksInterval}
+                                            onChange={e => setPromoRecurringWeeksInterval(Math.max(1, parseInt(e.target.value) || 1))}
+                                          />
+                                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>hetenként</span>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {promoType === 'recurring' && (
+                                    <>
+                                      <div>
+                                        <label className="input-label" style={{ fontSize: '11px', marginBottom: '6px' }}>Napok</label>
+                                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                          {[
+                                            { val: 1, label: 'H' },
+                                            { val: 2, label: 'K' },
+                                            { val: 3, label: 'Sze' },
+                                            { val: 4, label: 'Cs' },
+                                            { val: 5, label: 'P' },
+                                            { val: 6, label: 'Szo' },
+                                            { val: 7, label: 'V' }
+                                          ].map(day => {
+                                            const isSelected = promoRecurringDays.includes(day.val);
+                                            return (
+                                              <button
+                                                key={day.val}
+                                                type="button"
+                                                onClick={() => {
+                                                  if (isSelected) {
+                                                    setPromoRecurringDays(promoRecurringDays.filter(d => d !== day.val));
+                                                  } else {
+                                                    setPromoRecurringDays([...promoRecurringDays, day.val].sort());
+                                                  }
+                                                }}
+                                                style={{
+                                                  width: '30px',
+                                                  height: '30px',
+                                                  borderRadius: '6px',
+                                                  border: '1px solid rgba(255,255,255,0.08)',
+                                                  background: isSelected ? 'var(--primary)' : 'rgba(0,0,0,0.2)',
+                                                  color: 'white',
+                                                  fontSize: '11px',
+                                                  fontWeight: 600,
+                                                  cursor: 'pointer',
+                                                  transition: 'all 0.15s ease'
+                                                }}
+                                              >
+                                                {day.label}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+
+                                      {promoRecurringWeeksInterval > 1 && (
+                                        <div>
+                                          <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Kezdő dátum (hét számoláshoz)</label>
+                                          <input 
+                                            type="date"
+                                            className="input-field"
+                                            style={{ height: '32px', fontSize: '12px' }}
+                                            value={promoRecurringStartDate}
+                                            onChange={e => setPromoRecurringStartDate(e.target.value)}
+                                          />
+                                        </div>
+                                      )}
+                                    </>
+                                  )}
+
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                    <div>
+                                      <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Típus</label>
+                                      <input 
+                                        type="text"
+                                        className="input-field"
+                                        style={{ height: '32px', fontSize: '12px', background: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)' }}
+                                        value="Százalékos"
+                                        disabled
+                                      />
+                                    </div>
+
+                                    <div>
+                                      <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Módosítás (%)</label>
+                                      <input 
+                                        type="number"
+                                        className="input-field"
+                                        style={{ height: '32px', fontSize: '12px' }}
+                                        value={promoPriceAdjustmentValue}
+                                        onChange={e => setPromoPriceAdjustmentValue(parseInt(e.target.value) || 0)}
+                                        placeholder="pl: -10 vagy +15"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Csomagolási díj kezelése</label>
+                                    <AppleSelect
+                                      value={promoPackagingFeePolicy}
+                                      onChange={val => setPromoPackagingFeePolicy(val as 'standard' | 'free' | 'discounted')}
+                                      options={[
+                                        { value: 'standard', label: 'Rendes árán marad' },
+                                        { value: 'free', label: 'Ingyenes csomagolás' },
+                                        { value: 'discounted', label: 'Ugyanaz a % kedvezmény jöjjön le' }
+                                      ]}
+                                      icon={<Package size={12} />}
+                                      isOpen={openPromoPackDropdown}
+                                      onToggle={() => setOpenPromoPackDropdown(!openPromoPackDropdown)}
+                                      onClose={() => setOpenPromoPackDropdown(false)}
+                                      openUpward={true}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Column 2: Courses Configuration (only visible if newCatIsMenuCategory) */}
+                          {newCatIsMenuCategory && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', paddingLeft: '10px', borderLeft: '1px solid rgba(255,255,255,0.06)' }}>
                               {/* COURSES EDITOR PANEL */}
                               <div style={{
                                 border: '1px solid rgba(255,255,255,0.08)',
@@ -5349,7 +5575,7 @@ export default function App() {
                                     Még nincsenek fogások hozzáadva.
                                   </div>
                                 ) : (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '300px', overflowY: 'auto' }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '450px', overflowY: 'auto' }}>
                                     {newCatCourses.map((course) => {
                                       let courseItems: MenuItem[] = [];
                                       if (course.sourceType === 'category' && course.sourceCategoryId) {
@@ -5536,284 +5762,73 @@ export default function App() {
                                   </div>
                                 )}
                               </div>
-                            </>
-                          )}
-
-                          {/* TIMED PROMOTION CONFIGURATION CARD */}
-                          <div ref={promoPanelRef} style={{
-                            border: '1px solid rgba(255,255,255,0.08)',
-                            borderRadius: '10px',
-                            padding: '14px',
-                            background: 'rgba(255,255,255,0.02)',
-                            marginTop: '4px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '12px'
-                          }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)' }}>
-                                Időzített Árazás & Akciók
-                              </span>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', userSelect: 'none' }}>
-                                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                                  {promoIsEnabled ? 'Engedélyezve' : 'Kitiltva'}
-                                </span>
-                                <div 
-                                  onClick={() => {
-                                    const nextVal = !promoIsEnabled;
-                                    setPromoIsEnabled(nextVal);
-                                    if (nextVal) {
-                                      setTimeout(() => {
-                                        promoPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                                      }, 80);
-                                    }
-                                  }}
-                                  style={{
-                                    width: '36px',
-                                    height: '20px',
-                                    borderRadius: '10px',
-                                    background: promoIsEnabled ? '#30d158' : '#ff453a',
-                                    position: 'relative',
-                                    cursor: 'pointer',
-                                    transition: 'background-color 0.2s ease',
-                                    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)'
-                                  }}
-                                >
-                                  <div 
-                                    style={{
-                                      width: '16px',
-                                      height: '16px',
-                                      borderRadius: '50%',
-                                      background: 'white',
-                                      position: 'absolute',
-                                      top: '2px',
-                                      left: promoIsEnabled ? '18px' : '2px',
-                                      transition: 'left 0.2s ease',
-                                      boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
-                                    }}
-                                  />
-                                </div>
-                              </div>
                             </div>
+                          )}
+                        </div>
 
-                            {promoIsEnabled && (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px dashed rgba(255,255,255,0.06)', paddingTop: '10px' }}>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                  <div>
-                                    <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Típus</label>
-                                    <AppleSelect
-                                      value={promoType}
-                                      onChange={val => setPromoType(val as 'once' | 'recurring')}
-                                      options={[
-                                        { value: 'once', label: 'Egy alkalommal' },
-                                        { value: 'recurring', label: 'Ismétlődő' }
-                                      ]}
-                                      icon={<Activity size={12} />}
-                                      isOpen={openPromoTypeDropdown}
-                                      onToggle={() => setOpenPromoTypeDropdown(!openPromoTypeDropdown)}
-                                      onClose={() => setOpenPromoTypeDropdown(false)}
-                                    />
-                                  </div>
+                        {/* Modal Footer */}
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '14px', borderTop: '1px solid var(--glass-border)', paddingTop: '12px' }}>
+                          <button className="btn" onClick={() => setEditingCategory(null)}>Mégse</button>
+                          <button 
+                            className="btn"
+                            style={{ background: '#bf5af2', color: 'white' }}
+                            onClick={() => {
+                              const nameTrimmed = newCatName.trim();
+                              if (!nameTrimmed) return;
 
-                                  {promoType === 'once' ? (
-                                    <div>
-                                      <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Dátum</label>
-                                      <input 
-                                        type="date"
-                                        className="input-field"
-                                        style={{ height: '32px', fontSize: '12px' }}
-                                        value={promoOnceDate}
-                                        onChange={e => setPromoOnceDate(e.target.value)}
-                                      />
-                                    </div>
-                                  ) : (
-                                    <div>
-                                      <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Gyakoriság</label>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <input 
-                                          type="number"
-                                          className="input-field"
-                                          style={{ height: '32px', fontSize: '12px', width: '60px' }}
-                                          min={1}
-                                          value={promoRecurringWeeksInterval}
-                                          onChange={e => setPromoRecurringWeeksInterval(Math.max(1, parseInt(e.target.value) || 1))}
-                                        />
-                                        <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>hetenként</span>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
+                              const promoObj: PromotionSettings = {
+                                isEnabled: promoIsEnabled,
+                                type: promoType,
+                                onceDate: promoType === 'once' ? promoOnceDate : undefined,
+                                recurringDays: promoType === 'recurring' ? promoRecurringDays : undefined,
+                                recurringWeeksInterval: promoType === 'recurring' ? promoRecurringWeeksInterval : undefined,
+                                recurringStartDate: promoType === 'recurring' && promoRecurringWeeksInterval > 1 ? promoRecurringStartDate : undefined,
+                                priceAdjustmentType: 'percent',
+                                priceAdjustmentValue: promoPriceAdjustmentValue,
+                                packagingFeePolicy: promoPackagingFeePolicy
+                              };
 
-                                {promoType === 'recurring' && (
-                                  <>
-                                    <div>
-                                      <label className="input-label" style={{ fontSize: '11px', marginBottom: '6px' }}>Napok</label>
-                                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                        {[
-                                          { val: 1, label: 'H' },
-                                          { val: 2, label: 'K' },
-                                          { val: 3, label: 'Sze' },
-                                          { val: 4, label: 'Cs' },
-                                          { val: 5, label: 'P' },
-                                          { val: 6, label: 'Szo' },
-                                          { val: 7, label: 'V' }
-                                        ].map(day => {
-                                          const isSelected = promoRecurringDays.includes(day.val);
-                                          return (
-                                            <button
-                                              key={day.val}
-                                              type="button"
-                                              onClick={() => {
-                                                if (isSelected) {
-                                                  setPromoRecurringDays(promoRecurringDays.filter(d => d !== day.val));
-                                                } else {
-                                                  setPromoRecurringDays([...promoRecurringDays, day.val].sort());
-                                                }
-                                              }}
-                                              style={{
-                                                width: '30px',
-                                                height: '30px',
-                                                borderRadius: '6px',
-                                                border: '1px solid rgba(255,255,255,0.08)',
-                                                background: isSelected ? 'var(--primary)' : 'rgba(0,0,0,0.2)',
-                                                color: 'white',
-                                                fontSize: '11px',
-                                                fontWeight: 600,
-                                                cursor: 'pointer',
-                                                transition: 'all 0.15s ease'
-                                              }}
-                                            >
-                                              {day.label}
-                                            </button>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-
-                                    {promoRecurringWeeksInterval > 1 && (
-                                      <div>
-                                        <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Kezdő dátum (hét számoláshoz)</label>
-                                        <input 
-                                          type="date"
-                                          className="input-field"
-                                          style={{ height: '32px', fontSize: '12px' }}
-                                          value={promoRecurringStartDate}
-                                          onChange={e => setPromoRecurringStartDate(e.target.value)}
-                                        />
-                                      </div>
-                                    )}
-                                  </>
-                                )}
-
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                  <div>
-                                    <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Típus</label>
-                                    <input 
-                                      type="text"
-                                      className="input-field"
-                                      style={{ height: '32px', fontSize: '12px', background: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)' }}
-                                      value="Százalékos"
-                                      disabled
-                                    />
-                                  </div>
-
-                                  <div>
-                                    <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Módosítás (%)</label>
-                                    <input 
-                                      type="number"
-                                      className="input-field"
-                                      style={{ height: '32px', fontSize: '12px' }}
-                                      value={promoPriceAdjustmentValue}
-                                      onChange={e => setPromoPriceAdjustmentValue(parseInt(e.target.value) || 0)}
-                                      placeholder="pl: -10 vagy +15"
-                                    />
-                                  </div>
-                                </div>
-
-                                <div>
-                                  <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Csomagolási díj kezelése</label>
-                                  <AppleSelect
-                                    value={promoPackagingFeePolicy}
-                                    onChange={val => setPromoPackagingFeePolicy(val as 'standard' | 'free' | 'discounted')}
-                                    options={[
-                                      { value: 'standard', label: 'Rendes árán marad' },
-                                      { value: 'free', label: 'Ingyenes csomagolás' },
-                                      { value: 'discounted', label: 'Ugyanaz a % kedvezmény jöjjön le' }
-                                    ]}
-                                    icon={<Package size={12} />}
-                                    isOpen={openPromoPackDropdown}
-                                    onToggle={() => setOpenPromoPackDropdown(!openPromoPackDropdown)}
-                                    onClose={() => setOpenPromoPackDropdown(false)}
-                                    openUpward={true}
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>
-                            <button className="btn" onClick={() => setEditingCategory(null)}>Mégse</button>
-                            <button 
-                              className="btn"
-                              style={{ background: '#bf5af2', color: 'white' }}
-                              onClick={() => {
-                                const nameTrimmed = newCatName.trim();
-                                if (!nameTrimmed) return;
-
-                                const promoObj: PromotionSettings = {
-                                  isEnabled: promoIsEnabled,
-                                  type: promoType,
-                                  onceDate: promoType === 'once' ? promoOnceDate : undefined,
-                                  recurringDays: promoType === 'recurring' ? promoRecurringDays : undefined,
-                                  recurringWeeksInterval: promoType === 'recurring' ? promoRecurringWeeksInterval : undefined,
-                                  recurringStartDate: promoType === 'recurring' && promoRecurringWeeksInterval > 1 ? promoRecurringStartDate : undefined,
-                                  priceAdjustmentType: 'percent',
-                                  priceAdjustmentValue: promoPriceAdjustmentValue,
-                                  packagingFeePolicy: promoPackagingFeePolicy
-                                };
-
-                                const menuSched: MenuSchedule | undefined = newCatIsMenuCategory ? {
+                              const menuSched: MenuSchedule | undefined = newCatIsMenuCategory ? {
                                   days: newCatScheduleDays,
                                   fromTime: newCatScheduleFrom || undefined,
                                   toTime: newCatScheduleTo || undefined
                                 } : undefined;
 
-                                let updated = [...db.categories];
-                                if (editingCategory.id === 0) {
-                                  const newId = db.categories.length > 0 ? Math.max(...db.categories.map((c: any) => c.id)) + 1 : 1;
-                                  updated.push({
-                                    id: newId,
-                                    name: nameTrimmed,
-                                    description: newCatDescription.trim(),
-                                    is_active: true,
-                                    linked_category_id: newCatIsMenuCategory ? null : (newCatLinkedCategoryId === 'none' ? null : newCatLinkedCategoryId),
-                                    include_linked_packaging_fee: newCatIsMenuCategory ? false : (newCatLinkedCategoryId === 'none' ? false : newCatIncludeLinkedPackagingFee),
-                                    promotion: promoObj,
-                                    is_menu_category: newCatIsMenuCategory,
-                                    courses: newCatIsMenuCategory ? newCatCourses : undefined,
-                                    menu_schedule: menuSched
-                                  });
-                                } else {
-                                  updated = db.categories.map((c: any) => c.id === editingCategory.id ? {
-                                    ...c,
-                                    name: nameTrimmed,
-                                    description: newCatDescription.trim(),
-                                    linked_category_id: newCatIsMenuCategory ? null : (newCatLinkedCategoryId === 'none' ? null : newCatLinkedCategoryId),
-                                    include_linked_packaging_fee: newCatIsMenuCategory ? false : (newCatLinkedCategoryId === 'none' ? false : newCatIncludeLinkedPackagingFee),
-                                    promotion: promoObj,
-                                    is_menu_category: newCatIsMenuCategory,
-                                    courses: newCatIsMenuCategory ? newCatCourses : undefined,
-                                    menu_schedule: menuSched
-                                  } : c);
-                                }
+                              let updated = [...db.categories];
+                              if (editingCategory.id === 0) {
+                                const newId = db.categories.length > 0 ? Math.max(...db.categories.map((c: any) => c.id)) + 1 : 1;
+                                updated.push({
+                                  id: newId,
+                                  name: nameTrimmed,
+                                  description: newCatDescription.trim(),
+                                  is_active: true,
+                                  linked_category_id: newCatIsMenuCategory ? null : (newCatLinkedCategoryId === 'none' ? null : newCatLinkedCategoryId),
+                                  include_linked_packaging_fee: newCatIsMenuCategory ? false : (newCatLinkedCategoryId === 'none' ? false : newCatIncludeLinkedPackagingFee),
+                                  promotion: promoObj,
+                                  is_menu_category: newCatIsMenuCategory,
+                                  courses: newCatIsMenuCategory ? newCatCourses : undefined,
+                                  menu_schedule: menuSched
+                                });
+                              } else {
+                                updated = db.categories.map((c: any) => c.id === editingCategory.id ? {
+                                  ...c,
+                                  name: nameTrimmed,
+                                  description: newCatDescription.trim(),
+                                  linked_category_id: newCatIsMenuCategory ? null : (newCatLinkedCategoryId === 'none' ? null : newCatLinkedCategoryId),
+                                  include_linked_packaging_fee: newCatIsMenuCategory ? false : (newCatLinkedCategoryId === 'none' ? false : newCatIncludeLinkedPackagingFee),
+                                  promotion: promoObj,
+                                  is_menu_category: newCatIsMenuCategory,
+                                  courses: newCatIsMenuCategory ? newCatCourses : undefined,
+                                  menu_schedule: menuSched
+                                } : c);
+                              }
 
-                                saveDatabase({ ...db, categories: updated });
-                                setEditingCategory(null);
-                              }}
-                            >
-                              Mentés
-                            </button>
-                          </div>
+                              saveDatabase({ ...db, categories: updated });
+                              setEditingCategory(null);
+                            }}
+                          >
+                            Mentés
+                          </button>
                         </div>
 
                       </div>
