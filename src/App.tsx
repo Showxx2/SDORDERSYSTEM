@@ -3504,87 +3504,132 @@ export default function App() {
         }}>
         
         {/* LOGIN VIEW */}
-        {view === 'login' && (
-          <div className="login-view">
-            {/* Animated Background Orbs */}
-            <div className="login-bg-glow">
-              <div className="login-orb login-orb-1" />
-              <div className="login-orb login-orb-2" />
-              <div className="login-orb login-orb-3" />
-            </div>
-
-            <div className={`login-card ${loginFailedShake ? 'login-card-shake' : ''}`}>
-              <div className="login-header">
-                <div className="login-logo-orb">
-                  <div className="logo-inner-dot" />
-                </div>
-                <h2 className="login-logo">Bejelentkezés</h2>
-                <p className="login-subtitle">Ételrendelő és Kezelő Rendszer</p>
+        {view === 'login' && (() => {
+          const matchedLoginUser = db.users?.find(
+            (u: any) => u.username.trim().toLowerCase() === loginUsername.trim().toLowerCase()
+          );
+          return (
+            <div className="login-view">
+              {/* Animated Background Orbs */}
+              <div className="login-bg-glow">
+                <div className="login-orb login-orb-1" />
+                <div className="login-orb login-orb-2" />
+                <div className="login-orb login-orb-3" />
               </div>
-              <form className="login-form" onSubmit={handleLogin}>
-                {loginError && <div className="login-error-badge">{loginError}</div>}
-                
-                <div style={{ position: 'relative' }}>
-                  <label className="input-label">Felhasználónév</label>
-                  <input 
-                    type="text" 
-                    className="input-field" 
-                    value={loginUsername} 
-                    onChange={e => {
-                      setLoginUsername(e.target.value);
-                      if (loginError) setLoginError('');
-                    }} 
-                    placeholder="pl: admin"
-                    required 
-                    style={{
-                      paddingLeft: '36px',
-                      borderColor: loginError ? 'var(--danger)' : undefined
+
+              <div className={`login-card ${loginFailedShake ? 'login-card-shake' : ''}`}>
+                <div className="login-header">
+                  <div 
+                    className="login-logo-orb"
+                    style={{ 
+                      background: matchedLoginUser?.color 
+                        ? `linear-gradient(135deg, ${matchedLoginUser.color} 0%, rgba(255,255,255,0.06) 100%)` 
+                        : undefined,
+                      borderColor: matchedLoginUser?.color ? matchedLoginUser.color : undefined
                     }}
-                  />
-                  <span style={{ position: 'absolute', left: '12px', top: '35px', color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center' }}>
-                    <User size={16} />
-                  </span>
+                  >
+                    {matchedLoginUser ? (
+                      <span style={{ fontSize: '16px', fontWeight: 800, color: 'white' }}>
+                        {matchedLoginUser.name.charAt(0).toUpperCase()}
+                      </span>
+                    ) : (
+                      <div className="logo-inner-dot" />
+                    )}
+                  </div>
+                  <h2 className="login-logo">Bejelentkezés</h2>
+                  <p className="login-subtitle">Ételrendelő és Kezelő Rendszer</p>
+                  
+                  {matchedLoginUser && (
+                    <div style={{
+                      marginTop: '10px',
+                      fontSize: '12px',
+                      color: '#30d158',
+                      fontWeight: 600,
+                      background: 'rgba(48, 209, 88, 0.08)',
+                      border: '1px solid rgba(48, 209, 88, 0.15)',
+                      padding: '4px 12px',
+                      borderRadius: '20px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      animation: 'appleEntrance 0.3s ease-out'
+                    }}>
+                      <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: '#30d158', animation: 'pulseDot 1s infinite alternate' }} />
+                      Felismerve: {matchedLoginUser.name}
+                    </div>
+                  )}
                 </div>
-                
-                <div style={{ position: 'relative', marginTop: '14px' }}>
-                  <label className="input-label">Jelszó</label>
-                  <input 
-                    type="password" 
-                    className="input-field" 
-                    value={loginPassword} 
-                    onChange={e => {
-                      setLoginPassword(e.target.value);
-                      if (loginError) setLoginError('');
-                    }} 
-                    placeholder="••••••••"
-                    required 
-                    style={{
-                      paddingLeft: '36px',
-                      borderColor: loginError ? 'var(--danger)' : undefined
-                    }}
-                  />
-                  <span style={{ position: 'absolute', left: '12px', top: '35px', color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center' }}>
-                    <Lock size={16} />
-                  </span>
-                </div>
-                
-                <button 
-                  type="submit" 
-                  className={`btn-login-submit ${
-                    loginError 
-                      ? 'error' 
-                      : (!loginUsername.trim() || !loginPassword.trim()) 
-                        ? 'disabled' 
-                        : 'active'
-                  }`}
-                  disabled={!loginUsername.trim() || !loginPassword.trim()}
-                >
-                  Belépés
-                </button>
-              </form>
+                <form className="login-form" onSubmit={handleLogin}>
+                  {loginError && <div className="login-error-badge">{loginError}</div>}
+                  
+                  <div>
+                    <label className="input-label">Felhasználónév</label>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <span style={{ position: 'absolute', left: '12px', color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
+                        <User size={16} />
+                      </span>
+                      <input 
+                        type="text" 
+                        className="input-field" 
+                        value={loginUsername} 
+                        onChange={e => {
+                          setLoginUsername(e.target.value);
+                          if (loginError) setLoginError('');
+                        }} 
+                        placeholder="pl: admin"
+                        required 
+                        style={{
+                          paddingLeft: '38px',
+                          borderColor: loginError ? 'var(--danger)' : undefined,
+                          width: '100%'
+                        }}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div style={{ marginTop: '14px' }}>
+                    <label className="input-label">Jelszó</label>
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                      <span style={{ position: 'absolute', left: '12px', color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
+                        <Lock size={16} />
+                      </span>
+                      <input 
+                        type="password" 
+                        className="input-field" 
+                        value={loginPassword} 
+                        onChange={e => {
+                          setLoginPassword(e.target.value);
+                          if (loginError) setLoginError('');
+                        }} 
+                        placeholder="••••••••"
+                        required 
+                        style={{
+                          paddingLeft: '38px',
+                          borderColor: loginError ? 'var(--danger)' : undefined,
+                          width: '100%'
+                        }}
+                      />
+                    </div>
+                  </div>
+                  
+                  <button 
+                    type="submit" 
+                    className={`btn-login-submit ${
+                      loginError 
+                        ? 'error' 
+                        : (!loginUsername.trim() || !loginPassword.trim()) 
+                          ? 'disabled' 
+                          : 'active'
+                    }`}
+                    disabled={!loginUsername.trim() || !loginPassword.trim()}
+                  >
+                    Belépés
+                  </button>
+                </form>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* ORDER / MAIN MENU VIEW */}
         {view === 'menu' && (
