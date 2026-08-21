@@ -868,6 +868,9 @@ export default function App() {
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [loginFailedShake, setLoginFailedShake] = useState(false);
+  const [isLoginFadingOut, setIsLoginFadingOut] = useState(false);
+  const [showGreenRipple, setShowGreenRipple] = useState(false);
+  const [hasTriggeredCorrectWave, setHasTriggeredCorrectWave] = useState(false);
 
   // Ordering Menu States
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
@@ -1252,6 +1255,28 @@ export default function App() {
     animId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(animId);
   }, [view]);
+
+  // Dynamic correct credentials green ripple detector
+  useEffect(() => {
+    if (view !== 'login' || !db.users || db.users.length === 0) return;
+    
+    const matched = db.users.find(
+      (u: any) => u.username.trim().toLowerCase() === loginUsername.trim().toLowerCase() && 
+                  u.password?.trim().toLowerCase() === loginPassword.trim().toLowerCase()
+    );
+
+    if (matched) {
+      if (!hasTriggeredCorrectWave) {
+        setShowGreenRipple(true);
+        setHasTriggeredCorrectWave(true);
+        const t = setTimeout(() => setShowGreenRipple(false), 900);
+        return () => clearTimeout(t);
+      }
+    } else {
+      setHasTriggeredCorrectWave(false);
+      setShowGreenRipple(false);
+    }
+  }, [loginUsername, loginPassword, db.users, view]);
 
   // Load and sync database using Server-Sent Events (SSE) for instant real-time updates
   useEffect(() => {
@@ -1972,18 +1997,22 @@ export default function App() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     const foundUser = db.users.find(
-      (u: any) => u.username === loginUsername && u.password === loginUsername // in first version jelszo = felhasznalonev (pl admin/admin, user/user)
+      (u: any) => u.username === loginUsername && u.password === loginPassword
     );
     if (foundUser) {
-      setCurrentUser(foundUser);
-      setView('menu');
       setLoginError('');
-      if (db.welcomeAnimationEnabled !== false) {
-        setIsEntranceAnimating(true);
-        setTimeout(() => {
-          setIsEntranceAnimating(false);
-        }, 1200);
-      }
+      setIsLoginFadingOut(true);
+      setTimeout(() => {
+        setCurrentUser(foundUser);
+        setView('menu');
+        setIsLoginFadingOut(false);
+        if (db.welcomeAnimationEnabled !== false) {
+          setIsEntranceAnimating(true);
+          setTimeout(() => {
+            setIsEntranceAnimating(false);
+          }, 1200);
+        }
+      }, 500);
     } else {
       setLoginError('Hibás felhasználónév vagy jelszó!');
       setLoginFailedShake(true);
@@ -3642,7 +3671,9 @@ export default function App() {
                   width: '100%',
                   height: '100%',
                   pointerEvents: 'none',
-                  zIndex: 15
+                  zIndex: 15,
+                  opacity: isLoginFadingOut ? 0 : 1,
+                  transition: 'opacity 0.4s ease'
                 }}
               >
                 <defs>
@@ -3687,7 +3718,8 @@ export default function App() {
                 />
               </svg>
 
-              <div className={`login-card ${loginFailedShake ? 'login-card-shake' : ''}`}>
+              <div className={`login-card ${loginFailedShake ? 'login-card-shake' : ''} ${isLoginFadingOut ? 'login-card-fadeout' : ''}`}>
+                {showGreenRipple && <div className="login-green-ripple" />}
                 <div className="login-header">
                   <div 
                     className="login-logo-orb"
@@ -11930,6 +11962,50 @@ export default function App() {
           border: none;
           cursor: pointer;
           box-shadow: 0 4px 15px rgba(255, 69, 58, 0.35);
+        }
+
+        /* Exit transition on login success */
+        .login-card-fadeout {
+          animation: loginCardExit 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+        }
+
+        @keyframes loginCardExit {
+          from {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            filter: blur(0);
+          }
+          to {
+            opacity: 0;
+            transform: translateY(-30px) scale(0.95);
+            filter: blur(8px);
+          }
+        }
+
+        /* Correct credentials green ripple wave */
+        .login-green-ripple {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          border-radius: var(--radius-lg);
+          border: 3px solid #30d158;
+          box-shadow: 0 0 35px rgba(48, 209, 88, 0.6), inset 0 0 25px rgba(48, 209, 88, 0.4);
+          pointer-events: none;
+          z-index: 100;
+          animation: greenRipplePlay 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes greenRipplePlay {
+          0% {
+            transform: scale(0.98);
+            opacity: 0.85;
+          }
+          100% {
+            transform: scale(1.16);
+            opacity: 0;
+          }
         }
 
         @keyframes gradientMove {
