@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Settings, User, Search, Send, X, Plus, Trash2, 
+  Settings, User, Search, Send, X, Plus, Trash2, Lock, 
   History, Sparkles, TrendingUp, Layers, Package, Shield, 
   SendHorizontal, Truck, LogOut, 
   FileText, ChevronLeft, Percent, CreditCard, Wallet, 
@@ -867,6 +867,7 @@ export default function App() {
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [loginFailedShake, setLoginFailedShake] = useState(false);
 
   // Ordering Menu States
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
@@ -1881,6 +1882,10 @@ export default function App() {
       }
     } else {
       setLoginError('Hibás felhasználónév vagy jelszó!');
+      setLoginFailedShake(true);
+      setTimeout(() => {
+        setLoginFailedShake(false);
+      }, 500);
     }
   };
 
@@ -3501,36 +3506,79 @@ export default function App() {
         {/* LOGIN VIEW */}
         {view === 'login' && (
           <div className="login-view">
-            <div className="login-card">
+            {/* Animated Background Orbs */}
+            <div className="login-bg-glow">
+              <div className="login-orb login-orb-1" />
+              <div className="login-orb login-orb-2" />
+              <div className="login-orb login-orb-3" />
+            </div>
+
+            <div className={`login-card ${loginFailedShake ? 'login-card-shake' : ''}`}>
               <div className="login-header">
+                <div className="login-logo-orb">
+                  <div className="logo-inner-dot" />
+                </div>
                 <h2 className="login-logo">Bejelentkezés</h2>
                 <p className="login-subtitle">Ételrendelő és Kezelő Rendszer</p>
               </div>
               <form className="login-form" onSubmit={handleLogin}>
-                {loginError && <div className="login-error">{loginError}</div>}
-                <div>
+                {loginError && <div className="login-error-badge">{loginError}</div>}
+                
+                <div style={{ position: 'relative' }}>
                   <label className="input-label">Felhasználónév</label>
                   <input 
                     type="text" 
                     className="input-field" 
                     value={loginUsername} 
-                    onChange={e => setLoginUsername(e.target.value)} 
+                    onChange={e => {
+                      setLoginUsername(e.target.value);
+                      if (loginError) setLoginError('');
+                    }} 
                     placeholder="pl: admin"
                     required 
+                    style={{
+                      paddingLeft: '36px',
+                      borderColor: loginError ? 'var(--danger)' : undefined
+                    }}
                   />
+                  <span style={{ position: 'absolute', left: '12px', top: '35px', color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center' }}>
+                    <User size={16} />
+                  </span>
                 </div>
-                <div>
+                
+                <div style={{ position: 'relative', marginTop: '14px' }}>
                   <label className="input-label">Jelszó</label>
                   <input 
                     type="password" 
                     className="input-field" 
                     value={loginPassword} 
-                    onChange={e => setLoginPassword(e.target.value)} 
+                    onChange={e => {
+                      setLoginPassword(e.target.value);
+                      if (loginError) setLoginError('');
+                    }} 
                     placeholder="••••••••"
                     required 
+                    style={{
+                      paddingLeft: '36px',
+                      borderColor: loginError ? 'var(--danger)' : undefined
+                    }}
                   />
+                  <span style={{ position: 'absolute', left: '12px', top: '35px', color: 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center' }}>
+                    <Lock size={16} />
+                  </span>
                 </div>
-                <button type="submit" className="btn btn-primary" style={{ marginTop: '12px' }}>
+                
+                <button 
+                  type="submit" 
+                  className={`btn-login-submit ${
+                    loginError 
+                      ? 'error' 
+                      : (!loginUsername.trim() || !loginPassword.trim()) 
+                        ? 'disabled' 
+                        : 'active'
+                  }`}
+                  disabled={!loginUsername.trim() || !loginPassword.trim()}
+                >
                   Belépés
                 </button>
               </form>
@@ -11453,6 +11501,223 @@ export default function App() {
         /* Bottom search bar */
         .entrance-animating .bottom-navbar {
           animation: appleEntrance 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both;
+        }
+
+        /* Animated Login Background Orbs */
+        .login-view {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          height: 100%;
+          background: #000000;
+          overflow: hidden;
+          z-index: 1;
+        }
+
+        .login-bg-glow {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          overflow: hidden;
+          z-index: 0;
+          pointer-events: none;
+        }
+
+        .login-orb {
+          position: absolute;
+          width: 500px;
+          height: 500px;
+          border-radius: 50%;
+          filter: blur(140px);
+          opacity: 0.22;
+          mix-blend-mode: screen;
+          animation: rotateOrb 25s infinite alternate ease-in-out;
+        }
+
+        .login-orb-1 {
+          background: #0071e3;
+          top: -150px;
+          left: -100px;
+          animation-duration: 22s;
+        }
+
+        .login-orb-2 {
+          background: #bf5af2;
+          bottom: -200px;
+          right: -100px;
+          animation-duration: 28s;
+          animation-delay: -7s;
+        }
+
+        .login-orb-3 {
+          background: #ff453a;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 350px;
+          height: 350px;
+          opacity: 0.10;
+          animation-duration: 20s;
+          animation-delay: -12s;
+        }
+
+        @keyframes rotateOrb {
+          0% {
+            transform: translate(0, 0) rotate(0deg) scale(1);
+          }
+          50% {
+            transform: translate(80px, 40px) rotate(180deg) scale(1.15);
+          }
+          100% {
+            transform: translate(-40px, -60px) rotate(360deg) scale(0.95);
+          }
+        }
+
+        /* Glassmorphism login card */
+        .login-card {
+          position: relative;
+          z-index: 10;
+          background: rgba(22, 22, 23, 0.45);
+          backdrop-filter: blur(40px);
+          -webkit-backdrop-filter: blur(40px);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: var(--radius-lg);
+          padding: 40px;
+          width: 400px;
+          box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+          animation: loginCardEntrance 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        @keyframes loginCardEntrance {
+          from {
+            opacity: 0;
+            transform: translateY(30px) scale(0.96);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+
+        /* Login error shake animation */
+        .login-card-shake {
+          animation: appleShake 0.4s ease-in-out !important;
+        }
+
+        @keyframes appleShake {
+          0%, 100% { transform: translateX(0); }
+          15%, 45%, 75% { transform: translateX(-8px); }
+          30%, 60%, 90% { transform: translateX(8px); }
+        }
+
+        /* Logo badge */
+        .login-logo-orb {
+          width: 52px;
+          height: 52px;
+          border-radius: 15px;
+          background: linear-gradient(135deg, rgba(0, 113, 227, 0.15) 0%, rgba(191, 90, 242, 0.15) 100%);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto 18px auto;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .logo-inner-dot {
+          width: 16px;
+          height: 16px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #0071e3 0%, #bf5af2 100%);
+          animation: pulseDot 2s infinite alternate ease-in-out;
+        }
+
+        @keyframes pulseDot {
+          from {
+            transform: scale(0.85);
+            filter: drop-shadow(0 0 2px rgba(191, 90, 242, 0.4));
+          }
+          to {
+            transform: scale(1.1);
+            filter: drop-shadow(0 0 6px rgba(0, 113, 227, 0.7));
+          }
+        }
+
+        /* Form error badge */
+        .login-error-badge {
+          background: rgba(255, 69, 58, 0.12);
+          border: 1px solid rgba(255, 69, 58, 0.2);
+          color: #ff453a;
+          border-radius: var(--radius-sm);
+          padding: 8px 12px;
+          font-size: 13px;
+          text-align: center;
+          margin-bottom: 18px;
+          font-weight: 500;
+          animation: appleEntrance 0.3s ease-out;
+        }
+
+        /* Dynamic submit button */
+        .btn-login-submit {
+          width: 100%;
+          height: 42px;
+          border-radius: var(--radius-md);
+          font-weight: 600;
+          font-size: 14px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+          margin-top: 22px;
+          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Disabled submit state */
+        .btn-login-submit.disabled {
+          background: rgba(255, 255, 255, 0.05);
+          color: rgba(255, 255, 255, 0.25);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          cursor: not-allowed;
+          box-shadow: none;
+        }
+
+        /* Active submit state */
+        .btn-login-submit.active {
+          background: linear-gradient(135deg, #0071e3 0%, #bf5af2 50%, #ff453a 100%);
+          background-size: 200% 200%;
+          color: white;
+          border: none;
+          cursor: pointer;
+          box-shadow: 0 4px 15px rgba(0, 113, 227, 0.25);
+          animation: gradientMove 3s ease infinite;
+        }
+
+        .btn-login-submit.active:hover {
+          transform: translateY(-1px) scale(1.015);
+          box-shadow: 0 6px 20px rgba(191, 90, 242, 0.4);
+        }
+
+        .btn-login-submit.active:active {
+          transform: translateY(1px) scale(0.985);
+        }
+
+        /* Error submit state */
+        .btn-login-submit.error {
+          background: linear-gradient(135deg, #ff453a 0%, #ff3b30 100%);
+          color: white;
+          border: none;
+          cursor: pointer;
+          box-shadow: 0 4px 15px rgba(255, 69, 58, 0.35);
+        }
+
+        @keyframes gradientMove {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
         }
       `}</style>
     </div>
