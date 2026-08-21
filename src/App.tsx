@@ -1143,11 +1143,115 @@ export default function App() {
   
   const chatEndRef = useRef<HTMLDivElement>(null);
   const promoPanelRef = useRef<HTMLDivElement>(null);
+  const loginContainerRef = useRef<HTMLDivElement>(null);
+  const usernameInputRef = useRef<HTMLInputElement>(null);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
+  const submitButtonRef = useRef<HTMLButtonElement>(null);
 
   // Auto-scroll chat to bottom
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages, isChatbotOpen]);
+
+  // Aligned/Physical Login Rope States and Effects
+  const [mousePos, setMousePos] = useState({ x: 200, y: 0 });
+  const [targetPos, setTargetPos] = useState({ x: 0, y: 0 });
+  const [ropeCtrl, setRopeCtrl] = useState({ x: 200, y: 100 });
+  
+  const ctrlPhysics = useRef({ x: 200, y: 100, vx: 0, vy: 0 });
+  const mousePosRef = useRef({ x: 200, y: 0 });
+  const targetPosRef = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    mousePosRef.current = mousePos;
+  }, [mousePos]);
+
+  useEffect(() => {
+    targetPosRef.current = targetPos;
+  }, [targetPos]);
+
+  // Update target coordinates
+  const updateTargetPos = () => {
+    if (!loginContainerRef.current) return;
+    const containerRect = loginContainerRef.current.getBoundingClientRect();
+    
+    let activeRef: React.RefObject<any> = usernameInputRef;
+    if (loginUsername.trim().length > 0 && !loginPassword.trim()) {
+      activeRef = passwordInputRef;
+    } else if (loginUsername.trim().length > 0 && loginPassword.trim().length > 0) {
+      activeRef = submitButtonRef;
+    }
+    
+    if (activeRef.current) {
+      const rect = activeRef.current.getBoundingClientRect();
+      setTargetPos({
+        x: (rect.left + rect.right) / 2 - containerRect.left,
+        y: (rect.top + rect.bottom) / 2 - containerRect.top
+      });
+    }
+  };
+
+  // Run updateTargetPos when states or view shifts
+  useEffect(() => {
+    if (view === 'login') {
+      const t = setTimeout(updateTargetPos, 50);
+      return () => clearTimeout(t);
+    }
+  }, [view, loginUsername, loginPassword]);
+
+  // Window resize handler
+  useEffect(() => {
+    if (view === 'login') {
+      window.addEventListener('resize', updateTargetPos);
+      return () => window.removeEventListener('resize', updateTargetPos);
+    }
+  }, [view, loginUsername, loginPassword]);
+
+  // Physics animation loop for control point
+  useEffect(() => {
+    if (view !== 'login') return;
+
+    let animId: number;
+    const physics = ctrlPhysics.current;
+    
+    physics.x = (mousePosRef.current.x + targetPosRef.current.x) / 2;
+    physics.y = (mousePosRef.current.y + targetPosRef.current.y) / 2 + 100;
+    physics.vx = 0;
+    physics.vy = 0;
+    
+    const loop = () => {
+      const m = mousePosRef.current;
+      const t = targetPosRef.current;
+      
+      const restX = (m.x + t.x) / 2;
+      const dx = t.x - m.x;
+      const dy = t.y - m.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      const gravity = Math.max(40, 140 - dist * 0.12);
+      const restY = (m.y + t.y) / 2 + gravity;
+      
+      const k = 0.055;
+      const damping = 0.83;
+      
+      const ax = (restX - physics.x) * k;
+      const ay = (restY - physics.y) * k;
+      
+      physics.vx = (physics.vx + ax) * damping;
+      physics.vy = (physics.vy + ay) * damping;
+      
+      physics.x += physics.vx;
+      physics.y += physics.vy;
+      
+      if (!isNaN(physics.x) && !isNaN(physics.y)) {
+        setRopeCtrl({ x: physics.x, y: physics.y });
+      }
+      
+      animId = requestAnimationFrame(loop);
+    };
+    
+    animId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(animId);
+  }, [view]);
 
   // Load and sync database using Server-Sent Events (SSE) for instant real-time updates
   useEffect(() => {
@@ -3509,13 +3613,87 @@ export default function App() {
             (u: any) => u.username.trim().toLowerCase() === loginUsername.trim().toLowerCase()
           );
           return (
-            <div className="login-view">
+            <div 
+              ref={loginContainerRef}
+              className="login-view"
+              onMouseMove={(e) => {
+                const rect = loginContainerRef.current?.getBoundingClientRect();
+                if (rect) {
+                  setMousePos({
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
+                  });
+                }
+              }}
+            >
               {/* Animated Background Orbs */}
               <div className="login-bg-glow">
                 <div className="login-orb login-orb-1" />
                 <div className="login-orb login-orb-2" />
                 <div className="login-orb login-orb-3" />
               </div>
+
+              {/* Elastic Cursor Rope */}
+              <svg 
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  pointerEvents: 'none',
+                  zIndex: 5
+                }}
+              >
+                <defs>
+                  <linearGradient id="ropeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#0071e3" />
+                    <stop offset="50%" stopColor="#bf5af2" stopOpacity="0.8" />
+                    <stop offset="100%" stopColor="#ff453a" />
+                  </linearGradient>
+                  <filter id="ropeGlow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feMerge>
+                      <feMergeNode in="blur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
+                {/* Glow layer */}
+                <path 
+                  d={`M ${mousePos.x} ${mousePos.y} Q ${ropeCtrl.x} ${ropeCtrl.y} ${targetPos.x} ${targetPos.y}`}
+                  fill="none"
+                  stroke="url(#ropeGrad)"
+                  strokeWidth="5"
+                  strokeLinecap="round"
+                  opacity="0.3"
+                  filter="url(#ropeGlow)"
+                />
+                {/* Main line */}
+                <path 
+                  d={`M ${mousePos.x} ${mousePos.y} Q ${ropeCtrl.x} ${ropeCtrl.y} ${targetPos.x} ${targetPos.y}`}
+                  fill="none"
+                  stroke="url(#ropeGrad)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
+                {/* Node at cursor */}
+                <circle 
+                  cx={mousePos.x} 
+                  cy={mousePos.y} 
+                  r="4" 
+                  fill="white" 
+                  style={{ filter: 'drop-shadow(0 0 3px #0071e3)' }}
+                />
+                {/* Node at target */}
+                <circle 
+                  cx={targetPos.x} 
+                  cy={targetPos.y} 
+                  r="4" 
+                  fill="white" 
+                  style={{ filter: 'drop-shadow(0 0 3px #ff453a)' }}
+                />
+              </svg>
 
               <div className={`login-card ${loginFailedShake ? 'login-card-shake' : ''}`}>
                 <div className="login-header">
@@ -3569,6 +3747,7 @@ export default function App() {
                         <User size={16} />
                       </span>
                       <input 
+                        ref={usernameInputRef}
                         type="text" 
                         className="input-field" 
                         value={loginUsername} 
@@ -3594,6 +3773,7 @@ export default function App() {
                         <Lock size={16} />
                       </span>
                       <input 
+                        ref={passwordInputRef}
                         type="password" 
                         className="input-field" 
                         value={loginPassword} 
@@ -3613,6 +3793,7 @@ export default function App() {
                   </div>
                   
                   <button 
+                    ref={submitButtonRef}
                     type="submit" 
                     className={`btn-login-submit ${
                       loginError 
