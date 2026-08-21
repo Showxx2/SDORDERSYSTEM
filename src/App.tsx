@@ -3641,6 +3641,10 @@ export default function App() {
           const matchedLoginUser = db.users?.find(
             (u: any) => u.username.trim().toLowerCase() === loginUsername.trim().toLowerCase()
           );
+          const isCredentialsCorrect = db.users?.some(
+            (u: any) => u.username.trim().toLowerCase() === loginUsername.trim().toLowerCase() &&
+                        u.password?.trim().toLowerCase() === loginPassword.trim().toLowerCase()
+          );
           return (
             <div 
               ref={loginContainerRef}
@@ -3718,9 +3722,18 @@ export default function App() {
                 />
               </svg>
 
-              <div className={`login-card ${loginFailedShake ? 'login-card-shake' : ''} ${isLoginFadingOut ? 'login-card-fadeout' : ''}`}>
+              <div className={`login-card ${loginFailedShake ? 'login-card-shake' : ''} ${isLoginFadingOut ? 'login-card-fadeout' : ''} ${isCredentialsCorrect ? 'success-liquid' : ''}`}>
                 {showGreenRipple && <div className="login-green-ripple" />}
-                <div className="login-header">
+                
+                {isCredentialsCorrect && (
+                  <div className="login-liquid-container">
+                    <div className="login-liquid-blob blob-1" />
+                    <div className="login-liquid-blob blob-2" />
+                    <div className="login-liquid-blob blob-3" />
+                  </div>
+                )}
+
+                <div className="login-header" style={{ position: 'relative', zIndex: 2 }}>
                   <div 
                     className="login-logo-orb"
                     style={{ 
@@ -3761,7 +3774,7 @@ export default function App() {
                     </div>
                   )}
                 </div>
-                <form className="login-form" onSubmit={handleLogin}>
+                <form className="login-form" onSubmit={handleLogin} style={{ position: 'relative', zIndex: 2 }}>
                   {loginError && <div className="login-error-badge">{loginError}</div>}
                   
                   <div>
@@ -12006,6 +12019,85 @@ export default function App() {
             transform: scale(1.16);
             opacity: 0;
           }
+        }
+
+        /* Liquid Glass Siri Card styles */
+        .login-card.success-liquid {
+          border-color: rgba(48, 209, 88, 0.4) !important;
+          background: rgba(12, 34, 18, 0.45) !important;
+          animation: siriPulse 2.5s infinite ease-in-out;
+          box-shadow: 0 30px 70px rgba(0, 0, 0, 0.6), 
+                      0 0 35px rgba(48, 209, 88, 0.25),
+                      inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+        }
+
+        .login-liquid-container {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          overflow: hidden;
+          border-radius: var(--radius-lg);
+          z-index: 0;
+          pointer-events: none;
+        }
+
+        .login-liquid-blob {
+          position: absolute;
+          width: 250px;
+          height: 250px;
+          filter: blur(50px);
+          mix-blend-mode: screen;
+          opacity: 0.45;
+        }
+
+        .login-liquid-blob.blob-1 {
+          background: radial-gradient(circle, #30d158 0%, rgba(48, 209, 88, 0) 70%);
+          top: -60px;
+          left: -60px;
+          animation: floatBlob1 8s infinite alternate ease-in-out, morphLiquid 6s infinite ease-in-out;
+        }
+
+        .login-liquid-blob.blob-2 {
+          background: radial-gradient(circle, #34c759 0%, rgba(52, 199, 89, 0) 70%);
+          bottom: -70px;
+          right: -60px;
+          animation: floatBlob2 10s infinite alternate ease-in-out, morphLiquid 8s infinite ease-in-out;
+        }
+
+        .login-liquid-blob.blob-3 {
+          background: radial-gradient(circle, #00c7be 0%, rgba(0, 199, 190, 0) 70%);
+          top: 35%;
+          left: 25%;
+          width: 200px;
+          height: 200px;
+          animation: floatBlob3 11s infinite alternate ease-in-out, morphLiquid 7s infinite ease-in-out;
+        }
+
+        @keyframes morphLiquid {
+          0%, 100% { border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%; }
+          50% { border-radius: 70% 30% 52% 48% / 60% 40% 60% 40%; }
+        }
+
+        @keyframes floatBlob1 {
+          0% { transform: translate(0, 0) scale(1); }
+          100% { transform: translate(60px, 50px) scale(1.25); }
+        }
+
+        @keyframes floatBlob2 {
+          0% { transform: translate(0, 0) scale(1.15); }
+          100% { transform: translate(-50px, -60px) scale(0.85); }
+        }
+
+        @keyframes floatBlob3 {
+          0% { transform: translate(0, 0) scale(0.9); }
+          100% { transform: translate(40px, -40px) scale(1.2); }
+        }
+
+        @keyframes siriPulse {
+          0%, 100% { box-shadow: 0 30px 70px rgba(0, 0, 0, 0.6), 0 0 30px rgba(48, 209, 88, 0.2); }
+          50% { box-shadow: 0 30px 70px rgba(0, 0, 0, 0.6), 0 0 45px rgba(48, 209, 88, 0.45); }
         }
 
         @keyframes gradientMove {
