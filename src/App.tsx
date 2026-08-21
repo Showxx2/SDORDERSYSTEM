@@ -3646,10 +3646,18 @@ export default function App() {
                 }}
               >
                 <defs>
-                  <linearGradient id="ropeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#0071e3" />
-                    <stop offset="50%" stopColor="#bf5af2" stopOpacity="0.8" />
-                    <stop offset="100%" stopColor="#ff453a" />
+                  <linearGradient 
+                    id="ropeGrad" 
+                    x1={mousePos.x} 
+                    y1={mousePos.y} 
+                    x2={targetPos.x} 
+                    y2={targetPos.y}
+                    gradientUnits="userSpaceOnUse"
+                  >
+                    <stop offset="0%" stopColor="#0071e3" stopOpacity="0.95" />
+                    <stop offset="50%" stopColor="#bf5af2" stopOpacity="0.6" />
+                    <stop offset="85%" stopColor="#ff453a" stopOpacity="0.2" />
+                    <stop offset="100%" stopColor="#ff453a" stopOpacity="0" />
                   </linearGradient>
                   <filter id="ropeGlow" x="-20%" y="-20%" width="140%" height="140%">
                     <feGaussianBlur stdDeviation="3" result="blur" />
@@ -3676,22 +3684,6 @@ export default function App() {
                   stroke="url(#ropeGrad)"
                   strokeWidth="2.5"
                   strokeLinecap="round"
-                />
-                {/* Node at cursor */}
-                <circle 
-                  cx={mousePos.x} 
-                  cy={mousePos.y} 
-                  r="4" 
-                  fill="white" 
-                  style={{ filter: 'drop-shadow(0 0 3px #0071e3)' }}
-                />
-                {/* Node at target */}
-                <circle 
-                  cx={targetPos.x} 
-                  cy={targetPos.y} 
-                  r="4" 
-                  fill="white" 
-                  style={{ filter: 'drop-shadow(0 0 3px #ff453a)' }}
                 />
               </svg>
 
