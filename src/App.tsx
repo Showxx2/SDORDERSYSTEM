@@ -835,6 +835,7 @@ export default function App() {
   // App States
   const [currentUser, setCurrentUser] = useState<UserItem | null>(null);
   const [view, setView] = useState<'login' | 'menu' | 'admin'>('login');
+  const [isEntranceAnimating, setIsEntranceAnimating] = useState(false);
   
   // Database State
   const [db, setDb] = useState<any>({
@@ -858,7 +859,8 @@ export default function App() {
       excludePackaging: false,
       excludeDelivery: false,
       excludeDiscount: false
-    }
+    },
+    welcomeAnimationEnabled: true
   });
 
   // Login Form States
@@ -1165,6 +1167,7 @@ export default function App() {
               ...data,
               restrictLoginToSchedule: data.restrictLoginToSchedule !== undefined ? data.restrictLoginToSchedule : false,
               couriersCanReassign: data.couriersCanReassign !== undefined ? data.couriersCanReassign : false,
+              welcomeAnimationEnabled: data.welcomeAnimationEnabled !== undefined ? data.welcomeAnimationEnabled : true,
             };
           }
           return prev;
@@ -1870,7 +1873,12 @@ export default function App() {
       setCurrentUser(foundUser);
       setView('menu');
       setLoginError('');
-      // Log successful login
+      if (db.welcomeAnimationEnabled !== false) {
+        setIsEntranceAnimating(true);
+        setTimeout(() => {
+          setIsEntranceAnimating(false);
+        }, 1200);
+      }
     } else {
       setLoginError('Hibás felhasználónév vagy jelszó!');
     }
@@ -3400,7 +3408,7 @@ export default function App() {
   }
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${isEntranceAnimating ? 'entrance-animating' : ''}`}>
       {/* Top Navigation Bar */}
       <nav className="top-navbar">
         <div className="navbar-left">
@@ -8747,11 +8755,52 @@ export default function App() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span>Automatikus biztonsági mentés kilépéskor</span>
-                        <input type="checkbox" defaultChecked style={{ width: '20px', height: '20px' }} />
+                        <input type="checkbox" defaultChecked style={{ width: '18px', height: '18px', accentColor: '#bf5af2' }} />
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span>Nyugta automatikus nyomtatása rendeléskor</span>
-                        <input type="checkbox" defaultChecked style={{ width: '20px', height: '20px' }} />
+                        <input type="checkbox" defaultChecked style={{ width: '18px', height: '18px', accentColor: '#bf5af2' }} />
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed rgba(255,255,255,0.06)', paddingTop: '12px' }}>
+                        <span>Üdvözlő belépési animáció engedélyezése</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', userSelect: 'none' }}>
+                          <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                            {db.welcomeAnimationEnabled !== false ? 'Engedélyezve' : 'Kitiltva'}
+                          </span>
+                          <div 
+                            onClick={() => {
+                              const nextVal = db.welcomeAnimationEnabled === false;
+                              saveDatabase({
+                                ...db,
+                                welcomeAnimationEnabled: nextVal
+                              });
+                            }}
+                            style={{
+                              width: '36px',
+                              height: '20px',
+                              borderRadius: '10px',
+                              background: db.welcomeAnimationEnabled !== false ? '#30d158' : '#ff453a',
+                              position: 'relative',
+                              cursor: 'pointer',
+                              transition: 'background-color 0.2s ease',
+                              boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)'
+                            }}
+                          >
+                            <div 
+                              style={{
+                                width: '16px',
+                                height: '16px',
+                                borderRadius: '50%',
+                                background: 'white',
+                                position: 'absolute',
+                                top: '2px',
+                                left: db.welcomeAnimationEnabled !== false ? '18px' : '2px',
+                                transition: 'left 0.2s ease',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
+                              }}
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -11341,6 +11390,71 @@ export default function App() {
         );
       })()}
 
+      <style>{`
+        /* Staggered Apple-style Entrance Animation */
+        @keyframes appleEntrance {
+          from {
+            opacity: 0;
+            transform: translateY(20px) scale(0.98);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+
+        .entrance-animating .top-navbar {
+          animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        .entrance-animating .side-panel {
+          animation: appleEntrance 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
+        }
+
+        .entrance-animating .side-panel.right {
+          animation: appleEntrance 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+        }
+
+        .entrance-animating .menu-section-title {
+          animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+        }
+
+        /* Staggered category card entry */
+        .entrance-animating .category-card:nth-child(1) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both; }
+        .entrance-animating .category-card:nth-child(2) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both; }
+        .entrance-animating .category-card:nth-child(3) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.16s both; }
+        .entrance-animating .category-card:nth-child(4) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.20s both; }
+        .entrance-animating .category-card:nth-child(5) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.24s both; }
+        .entrance-animating .category-card:nth-child(n+6) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.28s both; }
+
+        /* Staggered menu item card entry */
+        .entrance-animating .item-card:nth-child(1) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both; }
+        .entrance-animating .item-card:nth-child(2) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.11s both; }
+        .entrance-animating .item-card:nth-child(3) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.14s both; }
+        .entrance-animating .item-card:nth-child(4) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.17s both; }
+        .entrance-animating .item-card:nth-child(5) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.20s both; }
+        .entrance-animating .item-card:nth-child(6) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.23s both; }
+        .entrance-animating .item-card:nth-child(7) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.26s both; }
+        .entrance-animating .item-card:nth-child(8) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.29s both; }
+        .entrance-animating .item-card:nth-child(n+9) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.32s both; }
+
+        /* Cart items staggering */
+        .entrance-animating .cart-item:nth-child(1) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both; }
+        .entrance-animating .cart-item:nth-child(2) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.16s both; }
+        .entrance-animating .cart-item:nth-child(3) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.20s both; }
+        .entrance-animating .cart-item:nth-child(n+4) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.24s both; }
+
+        /* Active orders list cards staggering */
+        .entrance-animating .order-card:nth-child(1) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.10s both; }
+        .entrance-animating .order-card:nth-child(2) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.14s both; }
+        .entrance-animating .order-card:nth-child(3) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both; }
+        .entrance-animating .order-card:nth-child(n+4) { animation: appleEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.22s both; }
+
+        /* Bottom search bar */
+        .entrance-animating .bottom-navbar {
+          animation: appleEntrance 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both;
+        }
+      `}</style>
     </div>
   );
 }
