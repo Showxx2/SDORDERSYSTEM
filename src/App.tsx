@@ -2316,7 +2316,7 @@ export default function App() {
       <head>
         <meta charset="utf-8">
         <style>
-          @page { size: 80mm auto; margin: 0; }
+          @page { margin: 0; }
           body {
             font-family: 'Courier New', Courier, monospace;
             width: 72mm;
