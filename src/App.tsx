@@ -860,8 +860,48 @@ export default function App() {
       excludeDelivery: false,
       excludeDiscount: false
     },
-    welcomeAnimationEnabled: true
+    welcomeAnimationEnabled: true,
+    selectedPrinter: '',
+    autoPrintOnOrder: true,
+    enableStaffPortals: true,
+    receiptConfig: {
+      logoBase64: '',
+      logoAlignment: 'center',
+      logoPosition: 'top',
+      logoScale: 50,
+      headerText: 'PRÉMIUM PIZZÉRIA & ÉTTEREM\nTel: +36 30 123 4567\nAdószám: 12345678-2-12',
+      footerText: 'Köszönjük a vásárlást!\nEgészségére!\nVárjuk vissza!',
+      showOrderId: true,
+      showTimestamp: true,
+      showPaymentMethod: true,
+      showCustomerDetails: true,
+      showComment: true,
+      showPackagingFee: true,
+      showDeliveryFee: true,
+      showDiscount: true,
+      fontSize: 'medium',
+      lineSpacing: 'normal'
+    }
   });
+
+  const [availablePrinters, setAvailablePrinters] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (window.electronAPI?.getPrinters) {
+      window.electronAPI.getPrinters().then((printers: any[]) => {
+        if (printers && printers.length > 0) {
+          setAvailablePrinters(printers.map((p: any) => p.name));
+        } else {
+          setAvailablePrinters(['Epson TM-T20II', 'Microsoft Print to PDF']);
+        }
+      }).catch((err: any) => {
+        console.error("Error loading printers:", err);
+        setAvailablePrinters(['Epson TM-T20II', 'Rendszer alapértelmezett']);
+      });
+    } else {
+      setAvailablePrinters(['Epson TM-T20II', 'Star TSP100', 'Microsoft Print to PDF', 'HP LaserJet 400']);
+    }
+  }, []);
 
   // Login Form States
   const [loginUsername, setLoginUsername] = useState('');
@@ -2211,6 +2251,218 @@ export default function App() {
     setIsPaymentViewActive(false);
   };
 
+  const generateReceiptHtml = (order: any) => {
+    const config = db.receiptConfig || {
+      logoBase64: '',
+      logoAlignment: 'center',
+      logoPosition: 'top',
+      logoScale: 50,
+      headerText: 'PRÉMIUM PIZZÉRIA & ÉTTEREM\nTel: +36 30 123 4567\nAdószám: 12345678-2-12',
+      footerText: 'Köszönjük a vásárlást!\nEgészségére!\nVárjuk vissza!',
+      showOrderId: true,
+      showTimestamp: true,
+      showPaymentMethod: true,
+      showCustomerDetails: true,
+      showComment: true,
+      showPackagingFee: true,
+      showDeliveryFee: true,
+      showDiscount: true,
+      fontSize: 'medium',
+      lineSpacing: 'normal'
+    };
+
+    const fontSizeMap: Record<string, string> = {
+      small: '11px',
+      medium: '13px',
+      large: '15px'
+    };
+    const lineSpacingMap: Record<string, string> = {
+      tight: '1.1',
+      normal: '1.4',
+      loose: '1.8'
+    };
+
+    const fSize = fontSizeMap[config.fontSize] || '13px';
+    const lSpacing = lineSpacingMap[config.lineSpacing] || '1.4';
+
+    const dateStr = order.created_at 
+      ? new Date(order.created_at).toLocaleString('hu-HU') 
+      : new Date().toLocaleString('hu-HU');
+
+    const renderLogoHtml = () => {
+      if (!config.logoBase64) return '';
+      const alignStyle = config.logoAlignment === 'center' 
+        ? 'margin: 0 auto; display: block;' 
+        : config.logoAlignment === 'right' 
+          ? 'margin: 0 0 0 auto; display: block;' 
+          : 'margin: 0 auto 0 0; display: block;';
+      return `<div style="padding: 6px 0; text-align: ${config.logoAlignment};">
+        <img src="${config.logoBase64}" style="max-width: ${config.logoScale}%; height: auto; ${alignStyle}" />
+      </div>`;
+    };
+
+    const subtotal = order.items.reduce((sum: number, item: any) => {
+      const price = item.custom_modifications ? item.custom_modifications.calculated_price : item.price_at_order;
+      return sum + price * item.quantity;
+    }, 0);
+    const packagingTotal = order.items.reduce((sum: number, item: any) => {
+      return sum + item.packaging_fee_at_order * item.quantity;
+    }, 0);
+    const discountAmount = (subtotal + packagingTotal) * ((order.discount_percentage || 0) / 100);
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          @page { size: 80mm auto; margin: 0; }
+          body {
+            font-family: 'Courier New', Courier, monospace;
+            width: 72mm;
+            margin: 0;
+            padding: 4mm 2mm;
+            font-size: ${fSize};
+            line-height: ${lSpacing};
+            color: #000;
+            background: #fff;
+          }
+          .text-center { text-align: center; }
+          .text-right { text-align: right; }
+          .bold { font-weight: bold; }
+          .divider { border-top: 1px dashed #000; margin: 8px 0; }
+          .double-divider { border-top: 2px double #000; margin: 8px 0; }
+          .items-table { width: 100%; border-collapse: collapse; }
+          .items-table th, .items-table td { padding: 4px 0; vertical-align: top; }
+          .pre-wrap { white-space: pre-wrap; font-family: inherit; margin: 0; }
+          .total-row { font-size: calc(${fSize} + 2px); font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        ${config.logoPosition === 'top' ? renderLogoHtml() : ''}
+        
+        ${config.headerText ? `<div class="text-center pre-wrap bold" style="margin-bottom: 8px;">${config.headerText}</div>` : ''}
+        
+        ${config.logoPosition === 'before_items' ? renderLogoHtml() : ''}
+        
+        <div class="divider"></div>
+        
+        ${config.showOrderId ? `<div><span class="bold">Nyugtaszám:</span> #${order.id}</div>` : ''}
+        ${config.showTimestamp ? `<div><span class="bold">Dátum:</span> ${dateStr}</div>` : ''}
+        <div><span class="bold">Kiszolgáló:</span> ${order.created_by_user || 'Rendszer'}</div>
+        ${config.showPaymentMethod ? `<div><span class="bold">Fizetési mód:</span> ${order.payment_method}</div>` : ''}
+        
+        <div class="divider"></div>
+        
+        <table class="items-table">
+          <thead>
+            <tr style="border-bottom: 1px solid #000;">
+              <th align="left" class="bold">Tétel</th>
+              <th align="center" class="bold" style="width: 10%;">Db</th>
+              <th align="right" class="bold" style="width: 25%;">Érték</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${order.items.map((item: any) => {
+              const price = item.custom_modifications ? item.custom_modifications.calculated_price : item.price_at_order;
+              const name = item.custom_modifications?.is_menu_order 
+                ? `${item.item_name} (Menü)`
+                : item.item_name;
+              
+              let subnotes = '';
+              if (item.custom_modifications) {
+                const mods = item.custom_modifications;
+                if (mods.portion === 'half') subnotes += ' [Fél adag]';
+                if (mods.selected_courses) {
+                  const courseNames = mods.selected_courses.map((c: any) => c.itemName).join(', ');
+                  subnotes += ` (${courseNames})`;
+                }
+              }
+              
+              return `
+                <tr>
+                  <td>
+                    <div>${name}</div>
+                    ${subnotes ? `<div style="font-size: 85%; padding-left: 4px; font-style: italic;">${subnotes}</div>` : ''}
+                  </td>
+                  <td align="center">${item.quantity}</td>
+                  <td align="right">${(price * item.quantity).toLocaleString()} Ft</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+        
+        <div class="divider"></div>
+        
+        <table style="width: 100%;">
+          <tr>
+            <td>Részösszeg:</td>
+            <td align="right">${subtotal.toLocaleString()} Ft</td>
+          </tr>
+          ${config.showPackagingFee && packagingTotal > 0 ? `
+            <tr>
+              <td>Csomagolási díj:</td>
+              <td align="right">${packagingTotal.toLocaleString()} Ft</td>
+            </tr>
+          ` : ''}
+          ${config.showDeliveryFee && order.delivery_fee > 0 ? `
+            <tr>
+              <td>Szállítási díj:</td>
+              <td align="right">${order.delivery_fee.toLocaleString()} Ft</td>
+            </tr>
+          ` : ''}
+          ${config.showDiscount && discountAmount > 0 ? `
+            <tr style="color: #000;">
+              <td>Kedvezmény (${order.discount_percentage}%):</td>
+              <td align="right">-${Math.round(discountAmount).toLocaleString()} Ft</td>
+            </tr>
+          ` : ''}
+          <tr class="total-row">
+            <td style="padding-top: 6px;">ÖSSZESEN:</td>
+            <td align="right" style="padding-top: 6px;">${order.total_amount.toLocaleString()} Ft</td>
+          </tr>
+        </table>
+        
+        ${config.showCustomerDetails && order.customer_address && order.customer_address !== 'Helyben fogyasztás' ? `
+          <div class="divider"></div>
+          <div class="bold">Kiszállítási Cím:</div>
+          <div>Vevő: ${order.customer_name}</div>
+          <div class="bold" style="font-size: calc(${fSize} + 1px);">${order.customer_address}</div>
+          ${config.showComment && order.split_details?.delivery_instructions ? `
+            <div style="font-size: 90%; font-style: italic;">Megjegyzés: ${order.split_details.delivery_instructions}</div>
+          ` : ''}
+        ` : ''}
+        
+        <div class="double-divider"></div>
+        
+        ${config.logoPosition === 'bottom' ? renderLogoHtml() : ''}
+        
+        ${config.footerText ? `<div class="text-center pre-wrap bold" style="margin-top: 8px;">${config.footerText}</div>` : ''}
+      </body>
+      </html>
+    `;
+  };
+
+  const printOrderReceipt = (order: any) => {
+    const html = generateReceiptHtml(order);
+    if (window.electronAPI?.printReceipt) {
+      window.electronAPI.printReceipt(html, db.selectedPrinter)
+        .then((res: any) => {
+          if (res && !res.success) {
+            console.error("Nyomtatási hiba:", res.error);
+            alert("Sikertelen nyomtatás: " + res.error);
+          }
+        })
+        .catch((err: any) => {
+          console.error("Nyomtatási hiba:", err);
+        });
+    } else {
+      console.log("Nyomtatási feladat szimuláció:", db.selectedPrinter);
+      console.log(html);
+    }
+  };
+
   // Submit Order
   const submitOrder = () => {
     if (cart.length === 0) return;
@@ -2261,7 +2513,7 @@ export default function App() {
       payment_method: paymentMethod,
       discount_percentage: discountPercentage,
       total_amount: finalAmount,
-      status: 'pending',
+      status: db.enableStaffPortals !== false ? 'pending' : 'completed',
       created_at: new Date().toISOString(),
       items: [...cart],
       split_details: paymentMethod === 'Bontott fizetés' ? { splitGroups, splitAssignments } : null,
@@ -2323,6 +2575,9 @@ export default function App() {
     };
 
     saveDatabase(updatedDb);
+    if (db.autoPrintOnOrder !== false) {
+      printOrderReceipt(newOrder);
+    }
     clearCart();
   };
 
@@ -3853,8 +4108,8 @@ export default function App() {
         {view === 'menu' && (
           <div className="order-view">
             
-            {/* Left Sidebar: Active Orders (Visible only if there are active orders) */}
-            {activeOrders.length > 0 && (
+            {/* Left Sidebar: Active Orders (Visible only if there are active orders and staff portals are enabled) */}
+            {db.enableStaffPortals !== false && activeOrders.length > 0 && (
               <aside className="side-panel">
                 <div className="panel-header">
                   <span className="panel-title">
@@ -7879,133 +8134,630 @@ export default function App() {
               })()}
 
               {/* TAB: DISPATCH */}
-              {adminTab === 'dispatch' && (
-                <>
-                  <div className="admin-header">
-                    <h2 className="admin-title">Rendelések továbbítása & Portál Beállítások</h2>
-                  </div>
+              {adminTab === 'dispatch' && (() => {
+                const config = db.receiptConfig || {
+                  logoBase64: '',
+                  logoAlignment: 'center',
+                  logoPosition: 'top',
+                  logoScale: 50,
+                  headerText: 'PRÉMIUM PIZZÉRIA & ÉTTEREM\nTel: +36 30 123 4567\nAdószám: 12345678-2-12',
+                  footerText: 'Köszönjük a vásárlást!\nEgészségére!\nVárjuk vissza!',
+                  showOrderId: true,
+                  showTimestamp: true,
+                  showPaymentMethod: true,
+                  showCustomerDetails: true,
+                  showComment: true,
+                  showPackagingFee: true,
+                  showDeliveryFee: true,
+                  showDiscount: true,
+                  fontSize: 'medium',
+                  lineSpacing: 'normal'
+                };
 
-                  {/* 1. Futár Panel Beállítások */}
-                  <div className="admin-card" style={{ marginBottom: '20px' }}>
-                    <span className="admin-card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Truck size={18} color="#0a84ff" />
-                      Futár Panel Beállítások
-                    </span>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '8px' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', color: 'white' }}>
-                        <input 
-                          type="checkbox"
-                          checked={db.couriersCanReassign || false}
-                          onChange={e => saveDatabase({ ...db, couriersCanReassign: e.target.checked })}
-                          style={{ width: '18px', height: '18px', accentColor: '#0a84ff' }}
-                        />
-                        <span>Engedélyezze, hogy a futárok módosíthassák a rendelésekhez rendelt futárt</span>
-                      </label>
-                      <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0 0 0 28px' }}>
-                        Ha be van kapcsolva, a bejelentkezett futárok átirányíthatják a rendeléseket más beosztott futárokra. Ha ki van kapcsolva, csak a még gazdátlan (üres) rendeléseket vehetik saját magukhoz.
-                      </p>
+                const updateConfig = (key: string, value: any) => {
+                  saveDatabase({
+                    ...db,
+                    receiptConfig: {
+                      ...config,
+                      [key]: value
+                    }
+                  });
+                };
+
+                const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      updateConfig('logoBase64', reader.result as string);
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                };
+
+                // Mock order for live preview and test printing
+                const previewOrder = {
+                  id: 1234,
+                  created_at: new Date().toISOString(),
+                  created_by_user: currentUser?.name || 'Rendszer',
+                  payment_method: 'Bankkártya',
+                  discount_percentage: 10,
+                  delivery_fee: 500,
+                  total_amount: 6720,
+                  customer_name: 'Kovács János',
+                  customer_address: '8900 Zalaegerszeg, Kossuth Lajos utca 12.',
+                  split_details: {
+                    delivery_instructions: 'Csengő a kapun balra, kérem hívjon érkezéskor.'
+                  },
+                  items: [
+                    { item_name: 'Margherita Pizza', quantity: 1, price_at_order: 1890, packaging_fee_at_order: 150 },
+                    { item_name: 'Bolognai Spagetti', quantity: 2, price_at_order: 2290, packaging_fee_at_order: 200 }
+                  ]
+                };
+
+                const fontSizeMap: Record<string, string> = {
+                  small: '11px',
+                  medium: '13px',
+                  large: '15px'
+                };
+                const lineSpacingMap: Record<string, string> = {
+                  tight: '1.1',
+                  normal: '1.4',
+                  loose: '1.8'
+                };
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    <div className="admin-header">
+                      <h2 className="admin-title">Rendelések továbbítása & Nyomtató Beállítások</h2>
                     </div>
-                  </div>
 
-                  {/* 2. Aktív Portál Munkamenetek */}
-                  <div className="admin-card" style={{ marginBottom: '20px' }}>
-                    <span className="admin-card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Activity size={18} color="#30d158" />
-                      Munkatársi Portál Aktív Munkamenetek ({activeSessions.length})
-                    </span>
-                    <div style={{ marginTop: '10px' }}>
-                      {activeSessions.length > 0 ? (
-                        <div className="table-container">
-                          <table className="admin-table">
-                            <thead>
-                              <tr>
-                                <th>Munkatárs</th>
-                                <th>Bejelentkezés</th>
-                                <th>Aktuális Nézet</th>
-                                <th style={{ textAlign: 'right' }}>Műveletek</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {activeSessions.map((session: WebSession) => {
-                                const user = db.users.find((u: any) => u.id === session.userId);
-                                if (!user) return null;
+                    {/* 1. Rendszer és Nyomtató Kapcsolatok */}
+                    <div className="admin-card">
+                      <span className="admin-card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <SlidersHorizontal size={18} color="#0a84ff" />
+                        Továbbítási Csatornák & Eszközök
+                      </span>
+                      
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '14px' }}>
+                        {/* Nyomtató választó */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
+                          <div style={{ flex: 1, minWidth: '260px' }}>
+                            <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                              Epson TM-T20II Nyugtanyomtató Kiválasztása
+                            </label>
+                            <select
+                              value={db.selectedPrinter || ''}
+                              onChange={e => saveDatabase({ ...db, selectedPrinter: e.target.value })}
+                              className="input-field"
+                              style={{ width: '100%', height: '38px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)', color: 'white', borderRadius: '8px', padding: '0 10px' }}
+                            >
+                              <option value="" style={{ background: '#1c1c1e' }}>Rendszer alapértelmezett (Silent print)</option>
+                              {availablePrinters.map(p => (
+                                <option key={p} value={p} style={{ background: '#1c1c1e' }}>{p}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
 
-                                return (
-                                  <tr key={session.userId}>
-                                    <td>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <div style={{
-                                          width: '24px',
-                                          height: '24px',
-                                          borderRadius: '50%',
-                                          background: user.color || '#bf5af2',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center'
-                                        }}>
-                                          {renderUserIcon(user.symbol || 'User', 12, 'white')}
-                                        </div>
-                                        <span style={{ fontWeight: 600, color: 'white' }}>{user.name}</span>
-                                      </div>
-                                    </td>
-                                    <td>{session.loginTime}</td>
-                                    <td>
-                                      <span style={{
-                                        fontSize: '10px',
-                                        background: 'rgba(255,255,255,0.05)',
-                                        padding: '2px 6px',
-                                        borderRadius: '4px',
-                                        color: 'white'
-                                      }}>
-                                        {session.activeView === 'kitchen' ? '👨‍🍳 Konyha' : session.activeView === 'courier' ? '🚗 Futár' : 'Kezdőlap'}
-                                      </span>
-                                    </td>
-                                    <td style={{ textAlign: 'right', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        {/* Nyomtatás Toggles */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                          <div>
+                            <span style={{ fontWeight: 600, fontSize: '13px', display: 'block' }}>Automatikus nyugtanyomtatás</span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>A "Beküldés" gombra való kattintáskor a blokk automatikusan kinyomtatódik.</span>
+                          </div>
+                          <input 
+                            type="checkbox"
+                            checked={db.autoPrintOnOrder !== false}
+                            onChange={e => saveDatabase({ ...db, autoPrintOnOrder: e.target.checked })}
+                            style={{ width: '20px', height: '20px', accentColor: '#0a84ff', cursor: 'pointer' }}
+                          />
+                        </div>
+
+                        {/* Munkatársi Portálok Toggle */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                          <div>
+                            <span style={{ fontWeight: 600, fontSize: '13px', display: 'block' }}>Munkatársi Portálok (Weboldalak) engedélyezése</span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Kikapcsolásakor a konyhai és futár felületek nem futnak, és nem kell nyilvántartani a bent lévő rendeléseket a főmenün.</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', userSelect: 'none' }}>
+                            <span style={{ fontSize: '11px', color: db.enableStaffPortals !== false ? '#30d158' : '#ff453a', fontWeight: 600 }}>
+                              {db.enableStaffPortals !== false ? 'AKTÍV' : 'LEÁLLÍTVA'}
+                            </span>
+                            <div 
+                              onClick={() => {
+                                const nextVal = db.enableStaffPortals === false;
+                                saveDatabase({
+                                  ...db,
+                                  enableStaffPortals: nextVal
+                                });
+                              }}
+                              style={{
+                                width: '36px',
+                                height: '20px',
+                                borderRadius: '10px',
+                                background: db.enableStaffPortals !== false ? '#30d158' : '#ff453a',
+                                position: 'relative',
+                                cursor: 'pointer',
+                                transition: 'background-color 0.2s ease',
+                                boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)'
+                              }}
+                            >
+                              <div 
+                                style={{
+                                  width: '16px',
+                                  height: '16px',
+                                  borderRadius: '50%',
+                                  background: 'white',
+                                  position: 'absolute',
+                                  top: '2px',
+                                  left: db.enableStaffPortals !== false ? '18px' : '2px',
+                                  transition: 'left 0.2s ease',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+
+                    {/* Futár panel beállítások */}
+                    <div className="admin-card">
+                      <span className="admin-card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Truck size={18} color="#0a84ff" />
+                        Futár Panel Jogosultságok
+                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '10px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '13px', color: 'white' }}>
+                          <input 
+                            type="checkbox"
+                            checked={db.couriersCanReassign || false}
+                            onChange={e => saveDatabase({ ...db, couriersCanReassign: e.target.checked })}
+                            style={{ width: '18px', height: '18px', accentColor: '#0a84ff' }}
+                          />
+                          <span>Engedélyezze, hogy a futárok módosíthassák a rendelésekhez rendelt futárt</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* 2. Blokkszerkesztő Kártya */}
+                    <div className="admin-card">
+                      <span className="admin-card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+                        <FileText size={18} color="#bf5af2" />
+                        Epson TM-T20II Nyugtaszerkesztő & Blokkdizájn
+                      </span>
+
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '30px', marginTop: '10px' }}>
+                        {/* Bal Oszlop - Beállítások */}
+                        <div style={{ flex: 1, minWidth: '320px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          
+                          {/* Logo feltöltés */}
+                          <div style={{ background: 'rgba(255,255,255,0.02)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                            <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 600 }}>Nyugta Logo Feltöltése</label>
+                            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                              <input 
+                                type="file" 
+                                accept="image/*" 
+                                id="receipt-logo-file"
+                                onChange={handleLogoUpload}
+                                style={{ display: 'none' }}
+                              />
+                              <button 
+                                className="btn btn-primary"
+                                style={{ padding: '6px 14px', fontSize: '12px' }}
+                                onClick={() => document.getElementById('receipt-logo-file')?.click()}
+                              >
+                                Tallózás...
+                              </button>
+                              {config.logoBase64 && (
+                                <>
+                                  <div style={{ position: 'relative', width: '38px', height: '38px', borderRadius: '4px', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                    <img src={config.logoBase64} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                                  </div>
+                                  <button 
+                                    className="btn"
+                                    style={{ padding: '6px 10px', fontSize: '11px', background: 'rgba(255,69,58,0.1)', color: '#ff453a', border: '1px solid rgba(255,69,58,0.2)' }}
+                                    onClick={() => updateConfig('logoBase64', '')}
+                                  >
+                                    Törlés
+                                  </button>
+                                </>
+                              )}
+                            </div>
+
+                            {config.logoBase64 && (
+                              <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '10px', borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: '10px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Logó elhelyezkedése:</span>
+                                  <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', padding: '2px', borderRadius: '8px' }}>
+                                    {['top', 'before_items', 'bottom'].map(pos => (
                                       <button
-                                        className="btn"
-                                        style={{ padding: '4px 10px', fontSize: '11px', background: 'rgba(255,159,10,0.15)', color: '#ff9f0a', border: '1px solid rgba(255,159,10,0.2)' }}
-                                        onClick={() => handleKickUser(session.userId)}
+                                        key={pos}
+                                        onClick={() => updateConfig('logoPosition', pos)}
+                                        style={{ border: 'none', background: config.logoPosition === pos ? 'var(--primary)' : 'transparent', color: 'white', fontSize: '10px', padding: '3px 8px', borderRadius: '6px', cursor: 'pointer' }}
                                       >
-                                        Lecsatlakoztatás
+                                        {pos === 'top' ? 'Legfelül' : pos === 'before_items' ? 'Középen' : 'Lul'}
                                       </button>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Logó igazítása:</span>
+                                  <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', padding: '2px', borderRadius: '8px' }}>
+                                    {['left', 'center', 'right'].map(align => (
                                       <button
-                                        className="btn"
-                                        style={{ padding: '4px 10px', fontSize: '11px', background: 'rgba(255,69,58,0.15)', color: '#ff453a', border: '1px solid rgba(255,69,58,0.2)' }}
-                                        onClick={() => handleToggleBanUser(session.userId)}
+                                        key={align}
+                                        onClick={() => updateConfig('logoAlignment', align)}
+                                        style={{ border: 'none', background: config.logoAlignment === align ? 'var(--primary)' : 'transparent', color: 'white', fontSize: '10px', padding: '3px 8px', borderRadius: '6px', cursor: 'pointer' }}
                                       >
-                                        Kitiltás
+                                        {align === 'left' ? 'Bal' : align === 'center' ? 'Közép' : 'Jobb'}
                                       </button>
-                                    </td>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                                    <span>Logó mérete:</span>
+                                    <span style={{ color: 'white', fontWeight: 'bold' }}>{config.logoScale}%</span>
+                                  </div>
+                                  <input 
+                                    type="range" 
+                                    min="20" 
+                                    max="100" 
+                                    value={config.logoScale} 
+                                    onChange={e => updateConfig('logoScale', parseInt(e.target.value))}
+                                    style={{ width: '100%', accentColor: 'var(--primary)' }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Szövegek */}
+                          <div>
+                            <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Fejléc szövege (Cím, adatok)</label>
+                            <textarea
+                              value={config.headerText || ''}
+                              onChange={e => updateConfig('headerText', e.target.value)}
+                              className="input-field"
+                              style={{ width: '100%', height: '70px', padding: '8px 10px', fontSize: '13px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)', color: 'white', borderRadius: '8px', resize: 'vertical' }}
+                              placeholder="Étterem neve, telefonszám..."
+                            />
+                          </div>
+
+                          <div>
+                            <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Lábléc szövege (Köszönet, üzenet)</label>
+                            <textarea
+                              value={config.footerText || ''}
+                              onChange={e => updateConfig('footerText', e.target.value)}
+                              className="input-field"
+                              style={{ width: '100%', height: '70px', padding: '8px 10px', fontSize: '13px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)', color: 'white', borderRadius: '8px', resize: 'vertical' }}
+                              placeholder="Köszönjük a vásárlást!..."
+                            />
+                          </div>
+
+                          {/* Formázás */}
+                          <div style={{ display: 'flex', gap: '16px' }}>
+                            <div style={{ flex: 1 }}>
+                              <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Betűméret</label>
+                              <select
+                                value={config.fontSize || 'medium'}
+                                onChange={e => updateConfig('fontSize', e.target.value)}
+                                className="input-field"
+                                style={{ width: '100%', height: '34px', fontSize: '12px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)', color: 'white', borderRadius: '6px', padding: '0 8px' }}
+                              >
+                                <option value="small" style={{ background: '#1c1c1e' }}>Kicsi (11px)</option>
+                                <option value="medium" style={{ background: '#1c1c1e' }}>Közepes (13px)</option>
+                                <option value="large" style={{ background: '#1c1c1e' }}>Nagy (15px)</option>
+                              </select>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Sorköz</label>
+                              <select
+                                value={config.lineSpacing || 'normal'}
+                                onChange={e => updateConfig('lineSpacing', e.target.value)}
+                                className="input-field"
+                                style={{ width: '100%', height: '34px', fontSize: '12px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)', color: 'white', borderRadius: '6px', padding: '0 8px' }}
+                              >
+                                <option value="tight" style={{ background: '#1c1c1e' }}>Szoros (1.1)</option>
+                                <option value="normal" style={{ background: '#1c1c1e' }}>Normál (1.4)</option>
+                                <option value="loose" style={{ background: '#1c1c1e' }}>Ritka (1.8)</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Toggles */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'rgba(255,255,255,0.01)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Megjelenített blokkelemek:</span>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                              {[
+                                { key: 'showOrderId', label: 'Nyugtaszám' },
+                                { key: 'showTimestamp', label: 'Dátum és idő' },
+                                { key: 'showPaymentMethod', label: 'Fizetési mód' },
+                                { key: 'showCustomerDetails', label: 'Vevő adatai' },
+                                { key: 'showComment', label: 'Megjegyzések' },
+                                { key: 'showPackagingFee', label: 'Csomagolási díj' },
+                                { key: 'showDeliveryFee', label: 'Szállítási díj' },
+                                { key: 'showDiscount', label: 'Kedvezmények' }
+                              ].map(item => (
+                                <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px' }}>
+                                  <input 
+                                    type="checkbox"
+                                    checked={(config as any)[item.key] !== false}
+                                    onChange={e => updateConfig(item.key, e.target.checked)}
+                                    style={{ width: '15px', height: '15px', accentColor: 'var(--primary)' }}
+                                  />
+                                  <span>{item.label}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Tesztnyomtatás */}
+                          <button 
+                            className="btn btn-primary"
+                            style={{ height: '40px', fontWeight: 600, background: 'linear-gradient(135deg, #bf5af2 0%, #ff453a 100%)', border: 'none', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                            onClick={() => printOrderReceipt(previewOrder)}
+                          >
+                            <FileText size={16} />
+                            Tesztblokk Nyomtatása
+                          </button>
+
+                        </div>
+
+                        {/* Jobb Oszlop - Epson TM-T20II Élő előnézet (80mm) */}
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '310px' }}>
+                          <span style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '8px', display: 'block' }}>
+                            Élő bizonylat előnézet (Epson 80mm kalibrált)
+                          </span>
+
+                          <div 
+                            className="receipt-container"
+                            style={{
+                              width: '300px',
+                              background: '#ffffff',
+                              color: '#000000',
+                              padding: '20px 14px 28px 14px',
+                              fontFamily: "'Courier New', Courier, monospace",
+                              fontSize: fontSizeMap[config.fontSize] || '13px',
+                              lineHeight: lineSpacingMap[config.lineSpacing] || '1.4',
+                              boxShadow: '0 10px 40px rgba(0,0,0,0.6)',
+                              position: 'relative',
+                              border: '1px solid #d1d1d6',
+                              borderBottom: 'none',
+                              borderRadius: '4px 4px 0 0',
+                              userSelect: 'none'
+                            }}
+                          >
+                            {/* Logo Top */}
+                            {config.logoPosition === 'top' && config.logoBase64 && (
+                              <div style={{ textAlign: config.logoAlignment as any, padding: '4px 0 10px 0' }}>
+                                <img src={config.logoBase64} style={{ maxWidth: `${config.logoScale}%`, height: 'auto' }} />
+                              </div>
+                            )}
+
+                            {/* Header */}
+                            {config.headerText && (
+                              <div style={{ textAlign: 'center', fontWeight: 'bold', whiteSpace: 'pre-wrap', marginBottom: '8px' }}>
+                                {config.headerText}
+                              </div>
+                            )}
+
+                            {/* Logo Before Items */}
+                            {config.logoPosition === 'before_items' && config.logoBase64 && (
+                              <div style={{ textAlign: config.logoAlignment as any, padding: '4px 0 10px 0' }}>
+                                <img src={config.logoBase64} style={{ maxWidth: `${config.logoScale}%`, height: 'auto' }} />
+                              </div>
+                            )}
+
+                            <div style={{ borderTop: '1px dashed #000000', margin: '8px 0' }}></div>
+
+                            {/* Metadata */}
+                            {config.showOrderId && <div><strong>Nyugtaszám:</strong> #1234</div>}
+                            {config.showTimestamp && <div><strong>Dátum:</strong> {new Date().toLocaleString('hu-HU')}</div>}
+                            <div><strong>Kiszolgáló:</strong> Rendszergazda</div>
+                            {config.showPaymentMethod && <div><strong>Fizetési mód:</strong> {previewOrder.payment_method}</div>}
+
+                            <div style={{ borderTop: '1px dashed #000000', margin: '8px 0' }}></div>
+
+                            {/* Table Header */}
+                            <div style={{ display: 'flex', fontWeight: 'bold', borderBottom: '1px solid #000000', paddingBottom: '3px', marginBottom: '4px' }}>
+                              <span style={{ flex: 1 }}>Tétel</span>
+                              <span style={{ width: '40px', textAlign: 'center' }}>Db</span>
+                              <span style={{ width: '80px', textAlign: 'right' }}>Érték</span>
+                            </div>
+
+                            {/* Table Items */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <div style={{ display: 'flex' }}>
+                                  <span style={{ flex: 1 }}>Margherita Pizza</span>
+                                  <span style={{ width: '40px', textAlign: 'center' }}>1</span>
+                                  <span style={{ width: '80px', textAlign: 'right' }}>1 890 Ft</span>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <div style={{ display: 'flex' }}>
+                                  <span style={{ flex: 1 }}>Bolognai Spagetti</span>
+                                  <span style={{ width: '40px', textAlign: 'center' }}>2</span>
+                                  <span style={{ width: '80px', textAlign: 'right' }}>4 580 Ft</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div style={{ borderTop: '1px dashed #000000', margin: '8px 0' }}></div>
+
+                            {/* Totals */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span>Részösszeg:</span>
+                                <span>6 470 Ft</span>
+                              </div>
+                              {config.showPackagingFee && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <span>Csomagolási díj:</span>
+                                  <span>550 Ft</span>
+                                </div>
+                              )}
+                              {config.showDeliveryFee && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <span>Szállítási díj:</span>
+                                  <span>500 Ft</span>
+                                </div>
+                              )}
+                              {config.showDiscount && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                  <span>Kedvezmény (10%):</span>
+                                  <span>-702 Ft</span>
+                                </div>
+                              )}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '110%', marginTop: '6px' }}>
+                                <span>ÖSSZESEN:</span>
+                                <span>6 818 Ft</span>
+                              </div>
+                            </div>
+
+                            {/* Customer Details */}
+                            {config.showCustomerDetails && (
+                              <>
+                                <div style={{ borderTop: '1px dashed #000000', margin: '8px 0' }}></div>
+                                <div><strong>Kiszállítási Cím:</strong></div>
+                                <div>Vevő: Kovács János</div>
+                                <div style={{ fontWeight: 'bold', fontSize: '105%' }}>8900 Zalaegerszeg, Kossuth Lajos utca 12.</div>
+                                {config.showComment && (
+                                  <div style={{ fontSize: '90%', fontStyle: 'italic', marginTop: '2px' }}>
+                                    Megjegyzés: Csengő a kapun balra, kérem hívjon érkezéskor.
+                                  </div>
+                                )}
+                              </>
+                            )}
+
+                            <div style={{ borderTop: '2px double #000000', margin: '8px 0' }}></div>
+
+                            {/* Logo Bottom */}
+                            {config.logoPosition === 'bottom' && config.logoBase64 && (
+                              <div style={{ textAlign: config.logoAlignment as any, padding: '10px 0 4px 0' }}>
+                                <img src={config.logoBase64} style={{ maxWidth: `${config.logoScale}%`, height: 'auto' }} />
+                              </div>
+                            )}
+
+                            {/* Footer */}
+                            {config.footerText && (
+                              <div style={{ textAlign: 'center', fontWeight: 'bold', whiteSpace: 'pre-wrap', marginTop: '6px' }}>
+                                {config.footerText}
+                              </div>
+                            )}
+
+                            {/* Zigzag bottom styling wrapper */}
+                            <style>{`
+                              .receipt-container::after {
+                                content: "";
+                                display: block;
+                                position: absolute;
+                                bottom: -8px;
+                                left: 0;
+                                width: 100%;
+                                height: 8px;
+                                background-image: linear-gradient(135deg, #ffffff 4px, transparent 0), linear-gradient(225deg, #ffffff 4px, transparent 0);
+                                background-position: left top;
+                                background-repeat: repeat-x;
+                                background-size: 8px 8px;
+                              }
+                            `}</style>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 3. Aktív Portál Munkamenetek (Csak ha be van kapcsolva a portál szerver) */}
+                    {db.enableStaffPortals !== false && (
+                      <div className="admin-card">
+                        <span className="admin-card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <Activity size={18} color="#30d158" />
+                          Munkatársi Portál Aktív Munkamenetek ({activeSessions.length})
+                        </span>
+                        <div style={{ marginTop: '10px' }}>
+                          {activeSessions.length > 0 ? (
+                            <div className="table-container">
+                              <table className="admin-table">
+                                <thead>
+                                  <tr>
+                                    <th>Munkatárs</th>
+                                    <th>Bejelentkezés</th>
+                                    <th>Aktuális Nézet</th>
+                                    <th style={{ textAlign: 'right' }}>Műveletek</th>
                                   </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : (
-                        <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-secondary)', fontSize: '12px' }}>
-                          Nincsenek aktív bejelentkezett munkatársak a weboldalon.
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                                </thead>
+                                <tbody>
+                                  {activeSessions.map((session: WebSession) => {
+                                    const user = db.users.find((u: any) => u.id === session.userId);
+                                    if (!user) return null;
 
-                  {/* 3. Aktív küldési csatornák */}
-                  <div className="admin-card">
-                    <span className="admin-card-title">Aktív küldési csatornák (Rendszer)</span>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
-                        <span>Konyhai Monitor integráció</span>
-                        <span style={{ color: 'var(--success)', fontWeight: 600 }}>AKTÍV</span>
+                                    return (
+                                      <tr key={session.userId}>
+                                        <td>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <div style={{
+                                              width: '24px',
+                                              height: '24px',
+                                              borderRadius: '50%',
+                                              background: user.color || '#bf5af2',
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              justifyContent: 'center'
+                                            }}>
+                                              {renderUserIcon(user.symbol || 'User', 12, 'white')}
+                                            </div>
+                                            <span style={{ fontWeight: 600, color: 'white' }}>{user.name}</span>
+                                          </div>
+                                        </td>
+                                        <td>{session.loginTime}</td>
+                                        <td>
+                                          <span style={{
+                                            fontSize: '10px',
+                                            background: 'rgba(255,255,255,0.05)',
+                                            padding: '2px 6px',
+                                            borderRadius: '4px',
+                                            color: 'white'
+                                          }}>
+                                            {session.activeView === 'kitchen' ? '👨‍🍳 Konyha' : session.activeView === 'courier' ? '🚗 Futár' : 'Kezdőlap'}
+                                          </span>
+                                        </td>
+                                        <td style={{ textAlign: 'right', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                          <button
+                                            className="btn"
+                                            style={{ padding: '4px 10px', fontSize: '11px', background: 'rgba(255,159,10,0.15)', color: '#ff9f0a', border: '1px solid rgba(255,159,10,0.2)' }}
+                                            onClick={() => handleKickUser(session.userId)}
+                                          >
+                                            Lecsatlakoztatás
+                                          </button>
+                                          <button
+                                            className="btn"
+                                            style={{ padding: '4px 10px', fontSize: '11px', background: 'rgba(255,69,58,0.15)', color: '#ff453a', border: '1px solid rgba(255,69,58,0.2)' }}
+                                            onClick={() => handleToggleBanUser(session.userId)}
+                                          >
+                                            Kitiltás
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : (
+                            <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-secondary)', fontSize: '12px' }}>
+                              Nincsenek aktív bejelentkezett munkatársak a weboldalon.
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
-                        <span>Blokknyomtató (Star TSP100)</span>
-                        <span style={{ color: 'var(--success)', fontWeight: 600 }}>AKTÍV</span>
-                      </div>
-                    </div>
+                    )}
                   </div>
-                </>
-              )}
+                );
+              })()}
 
               {/* TAB: DELIVERY FEES */}
               {adminTab === 'delivery' && (() => {

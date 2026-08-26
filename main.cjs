@@ -153,6 +153,10 @@ function saveDatabase(data) {
   try {
     fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), 'utf-8');
     broadcastToClients(data);
+    
+    // Dynamic server control based on database setting
+    controlServer(data.enableStaffPortals);
+    
     return { success: true };
   } catch (error) {
     console.error('Error saving database:', error);
@@ -190,6 +194,93 @@ function createWindow() {
   });
 }
 
+// Spin up a simple HTTP server to allow external web browsers to fetch/save the DB
+const http = require('http');
+
+function initHttpServer() {
+  if (server) return;
+  server = http.createServer((req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.writeHead(200);
+      res.end();
+      return;
+    }
+
+    if (req.url === '/api/events' && req.method === 'GET') {
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*'
+      });
+      
+      // Push the current database state immediately upon connection
+      res.write('data: ' + JSON.stringify(loadDatabase()) + '\n\n');
+      
+      sseClients.push(res);
+      
+      req.on('close', () => {
+        sseClients = sseClients.filter(c => c !== res);
+      });
+      return;
+    }
+
+    if (req.url === '/api/db' && req.method === 'GET') {
+      const dbData = loadDatabase();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(dbData));
+      return;
+    }
+
+    if (req.url === '/api/db' && req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => {
+        body += chunk.toString();
+      });
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          saveDatabase(parsed);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+        } catch (err) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid JSON' }));
+        }
+      });
+      return;
+    }
+
+    res.writeHead(404);
+    res.end('Not Found');
+  });
+}
+
+function controlServer(enableStaffPortals) {
+  initHttpServer();
+  if (enableStaffPortals !== false) {
+    if (!server.listening) {
+      server.listen(3001, '0.0.0.0', () => {
+        console.log('Database HTTP Sync server listening on http://localhost:3001');
+      });
+    }
+  } else {
+    if (server && server.listening) {
+      server.close(() => {
+        console.log('Database HTTP Sync server closed');
+      });
+      sseClients.forEach(client => {
+        try { client.end(); } catch(e) {}
+      });
+      sseClients = [];
+    }
+  }
+}
+
 // Setup IPC Handlers
 ipcMain.handle('db-load', async () => {
   return loadDatabase();
@@ -199,8 +290,58 @@ ipcMain.handle('db-save', async (event, data) => {
   return saveDatabase(data);
 });
 
+ipcMain.handle('get-printers', async () => {
+  if (mainWindow) {
+    try {
+      return await mainWindow.webContents.getPrintersAsync();
+    } catch (err) {
+      console.error("Error getting printers in main process:", err);
+      return [];
+    }
+  }
+  return [];
+});
+
+ipcMain.handle('print-receipt', async (event, htmlContent, printerName) => {
+  return new Promise((resolve) => {
+    try {
+      let workerWindow = new BrowserWindow({
+        show: false,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true
+        }
+      });
+      
+      workerWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+      
+      workerWindow.webContents.on('did-finish-load', () => {
+        workerWindow.webContents.print({
+          silent: true,
+          printBackground: true,
+          deviceName: printerName || undefined
+        }, (success, failureReason) => {
+          workerWindow.close();
+          if (success) {
+            resolve({ success: true });
+          } else {
+            console.error("Silent printing failed:", failureReason);
+            resolve({ success: false, error: failureReason });
+          }
+        });
+      });
+    } catch (err) {
+      console.error("Silent printing error:", err);
+      resolve({ success: false, error: err.message });
+    }
+  });
+});
+
 app.whenReady().then(() => {
   initDatabase();
+  const dbData = loadDatabase();
+  // Start server only if portals are enabled
+  controlServer(dbData.enableStaffPortals);
   createWindow();
 
   app.on('activate', () => {
@@ -212,70 +353,4 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
-});
-
-// Spin up a simple HTTP server to allow external web browsers to fetch/save the DB
-const http = require('http');
-const server = http.createServer((req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    res.writeHead(200);
-    res.end();
-    return;
-  }
-
-  if (req.url === '/api/events' && req.method === 'GET') {
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-      'Access-Control-Allow-Origin': '*'
-    });
-    
-    // Push the current database state immediately upon connection
-    res.write('data: ' + JSON.stringify(loadDatabase()) + '\n\n');
-    
-    sseClients.push(res);
-    
-    req.on('close', () => {
-      sseClients = sseClients.filter(c => c !== res);
-    });
-    return;
-  }
-
-  if (req.url === '/api/db' && req.method === 'GET') {
-    const dbData = loadDatabase();
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(dbData));
-    return;
-  }
-
-  if (req.url === '/api/db' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => {
-      body += chunk.toString();
-    });
-    req.on('end', () => {
-      try {
-        const parsed = JSON.parse(body);
-        saveDatabase(parsed);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true }));
-      } catch (err) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Invalid JSON' }));
-      }
-    });
-    return;
-  }
-
-  res.writeHead(404);
-  res.end('Not Found');
-});
-
-server.listen(3001, '0.0.0.0', () => {
-  console.log('Database HTTP Sync server listening on http://localhost:3001');
 });
