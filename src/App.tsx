@@ -2343,7 +2343,6 @@ export default function App() {
         ${activeConfig.showOrderId ? `<div><span class="bold">Nyugtaszám:</span> #${order.id}</div>` : ''}
         ${activeConfig.showTimestamp ? `<div><span class="bold">Dátum:</span> ${dateStr}</div>` : ''}
         <div><span class="bold">Kiszolgáló:</span> ${order.created_by_user || 'Rendszer'}</div>
-        ${activeConfig.showPaymentMethod && layout !== 'kitchen' ? `<div><span class="bold">Fizetési mód:</span> ${order.payment_method}</div>` : ''}
       `;
     };
 
@@ -2434,6 +2433,7 @@ export default function App() {
 
     const renderTotalsBlock = () => {
       if (layout === 'kitchen') return '';
+      const paymentSuffix = activeConfig.showPaymentMethod ? ` (${order.payment_method})` : '';
       return `
         <table style="width: 100%;">
           <tr>
@@ -2459,7 +2459,7 @@ export default function App() {
             </tr>
           ` : ''}
           <tr class="total-row">
-            <td style="padding-top: 6px;">ÖSSZESEN:</td>
+            <td style="padding-top: 6px;">ÖSSZESEN${paymentSuffix}:</td>
             <td align="right" style="padding-top: 6px;">${order.total_amount.toLocaleString()} Ft</td>
           </tr>
         </table>
@@ -8809,7 +8809,6 @@ export default function App() {
                                   {config.showOrderId && <div><strong>Nyugtaszám:</strong> #1234</div>}
                                   {config.showTimestamp && <div><strong>Dátum:</strong> {new Date().toLocaleString('hu-HU')}</div>}
                                   <div><strong>Kiszolgáló:</strong> Rendszergazda</div>
-                                  {config.showPaymentMethod && layout !== 'kitchen' && <div><strong>Fizetési mód:</strong> {previewOrder.payment_method}</div>}
                                 </>
                               );
 
@@ -8917,7 +8916,7 @@ export default function App() {
                                     </div>
                                   )}
                                   <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '110%', marginTop: '6px' }}>
-                                    <span>ÖSSZESEN:</span>
+                                    <span>ÖSSZESEN{config.showPaymentMethod ? ` (${previewOrder.payment_method})` : ''}:</span>
                                     <span>6 818 Ft</span>
                                   </div>
                                 </div>
