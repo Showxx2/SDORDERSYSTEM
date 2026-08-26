@@ -6658,7 +6658,7 @@ export default function App() {
                           </div>
                         </div>
                         
-                        <div className="table-container" style={{ maxHeight: showFilterPanel ? 'calc(100vh - 490px)' : 'calc(100vh - 260px)', overflowY: 'auto', paddingBottom: '10px' }}>
+                        <div className="table-container" style={{ maxHeight: showFilterPanel ? 'calc(100vh - 430px)' : 'calc(100vh - 310px)', overflowY: 'auto', paddingBottom: '10px' }}>
                           <table className="admin-table">
                             <thead>
                               <tr>
@@ -6800,7 +6800,7 @@ export default function App() {
 
                       {/* Right Slide: Kategóriák table */}
                       <div style={{ width: '50%', flexShrink: 0, paddingLeft: '12px' }}>
-                        <div className="table-container" style={{ maxHeight: 'calc(100vh - 260px)', overflowY: 'auto', paddingBottom: '10px' }}>
+                        <div className="table-container" style={{ maxHeight: 'calc(100vh - 310px)', overflowY: 'auto', paddingBottom: '10px' }}>
                           <table className="admin-table">
                             <thead>
                               <tr>
@@ -7278,7 +7278,7 @@ export default function App() {
                       }}>
                         {/* Left Slide: Raktárcikkek table */}
                         <div style={{ width: '33.333%', flexShrink: 0, paddingRight: '12px' }}>
-                          <div className="table-container" style={{ maxHeight: 'calc(100vh - 260px)', overflowY: 'auto', paddingBottom: '10px' }}>
+                          <div className="table-container" style={{ maxHeight: 'calc(100vh - 310px)', overflowY: 'auto', paddingBottom: '10px' }}>
                             <table className="admin-table">
                               <thead>
                                 <tr>
@@ -7384,7 +7384,7 @@ export default function App() {
 
                         {/* Middle Slide: Kategóriák table */}
                         <div style={{ width: '33.333%', flexShrink: 0, paddingLeft: '12px', paddingRight: '12px' }}>
-                          <div className="table-container" style={{ maxHeight: 'calc(100vh - 260px)', overflowY: 'auto', paddingBottom: '10px' }}>
+                          <div className="table-container" style={{ maxHeight: 'calc(100vh - 310px)', overflowY: 'auto', paddingBottom: '10px' }}>
                             <table className="admin-table">
                               <thead>
                                 <tr>
@@ -7474,7 +7474,7 @@ export default function App() {
 
                         {/* Right Slide: Beszerzési helyek table */}
                         <div style={{ width: '33.333%', flexShrink: 0, paddingLeft: '12px' }}>
-                          <div className="table-container" style={{ maxHeight: 'calc(100vh - 260px)', overflowY: 'auto', paddingBottom: '10px' }}>
+                          <div className="table-container" style={{ maxHeight: 'calc(100vh - 310px)', overflowY: 'auto', paddingBottom: '10px' }}>
                             <table className="admin-table">
                               <thead>
                                 <tr>
@@ -7989,7 +7989,7 @@ export default function App() {
                       </button>
                     </div>
 
-                    <div className="table-container" style={{ maxHeight: 'calc(100vh - 230px)', overflowY: 'auto' }}>
+                    <div className="table-container" style={{ maxHeight: 'calc(100vh - 310px)', overflowY: 'auto' }}>
                       <table className="admin-table">
                         <thead>
                           <tr>
