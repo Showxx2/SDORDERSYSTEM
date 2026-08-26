@@ -5144,7 +5144,7 @@ export default function App() {
 
               {/* TAB: EDIT MENU */}
               {adminTab === 'menu' && (
-                <>
+                <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 112px)', overflow: 'hidden' }}>
                   <div className="admin-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '16px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
                       <h2 className="admin-title" style={{ margin: 0 }}>Étlap szerkesztése</h2>
@@ -6519,15 +6519,17 @@ export default function App() {
                   )}
 
                   {/* Sliding Container for Tables (smooth horizontal switch) */}
-                  <div style={{ overflow: 'hidden', width: '100%', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ overflow: 'hidden', width: '100%', borderRadius: 'var(--radius-md)', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                     <div style={{ 
                       display: 'flex', 
                       width: '200%', 
+                      flex: 1,
+                      minHeight: 0,
                       transform: menuSubTab === 'items' ? 'translateX(0%)' : 'translateX(-50%)', 
                       transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)' 
                     }}>
                       {/* Left Slide: Ételcikkek table */}
-                      <div style={{ width: '50%', flexShrink: 0, paddingRight: '12px' }}>
+                      <div style={{ width: '50%', flexShrink: 0, paddingRight: '12px', display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
                         
                         {/* Filter panel card (placed inside the left slide so it only pushes this table down) */}
                         <div className={`admin-filter-panel ${showFilterPanel ? 'show' : ''}`}>
@@ -6658,7 +6660,7 @@ export default function App() {
                           </div>
                         </div>
                         
-                        <div className="table-container" style={{ maxHeight: showFilterPanel ? 'calc(100vh - 430px)' : 'calc(100vh - 310px)', overflowY: 'auto', paddingBottom: '10px' }}>
+                        <div className="table-container" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: '10px' }}>
                           <table className="admin-table">
                             <thead>
                               <tr>
@@ -6799,8 +6801,8 @@ export default function App() {
                       </div>
 
                       {/* Right Slide: Kategóriák table */}
-                      <div style={{ width: '50%', flexShrink: 0, paddingLeft: '12px' }}>
-                        <div className="table-container" style={{ maxHeight: 'calc(100vh - 310px)', overflowY: 'auto', paddingBottom: '10px' }}>
+                      <div style={{ width: '50%', flexShrink: 0, paddingLeft: '12px', display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+                        <div className="table-container" style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: '10px' }}>
                           <table className="admin-table">
                             <thead>
                               <tr>
@@ -6868,7 +6870,7 @@ export default function App() {
                       </div>
                     </div>
                   </div>
-                </>
+                </div>
               )}
 
               {/* TAB: PACKAGING FEES */}
