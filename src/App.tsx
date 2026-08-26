@@ -885,6 +885,7 @@ export default function App() {
   });
 
   const [availablePrinters, setAvailablePrinters] = useState<string[]>([]);
+  const [selectedConfigIndex, setSelectedConfigIndex] = useState(0);
 
   const refreshPrinters = () => {
     if (window.electronAPI?.getPrinters) {
@@ -2257,8 +2258,12 @@ export default function App() {
     setIsPaymentViewActive(false);
   };
 
-  const generateReceiptHtml = (order: any) => {
-    const config = db.receiptConfig || {
+  const getReceiptConfigs = (): any[] => {
+    if (db.receiptConfigs && Array.isArray(db.receiptConfigs) && db.receiptConfigs.length > 0) {
+      return db.receiptConfigs;
+    }
+    const legacy = db.receiptConfig || {
+      name: '1. Példány (Vendég)',
       logoBase64: '',
       logoAlignment: 'center',
       logoPosition: 'top',
@@ -2274,9 +2279,15 @@ export default function App() {
       showDeliveryFee: true,
       showDiscount: true,
       fontSize: 'medium',
-      lineSpacing: 'normal'
+      lineSpacing: 'normal',
+      silentPrint: true
     };
+    if (!legacy.name) legacy.name = '1. Példány (Vendég)';
+    return [legacy];
+  };
 
+  const generateReceiptHtml = (order: any, config?: any) => {
+    const activeConfig = config || getReceiptConfigs()[0];
     const fontSizeMap: Record<string, string> = {
       small: '11px',
       medium: '13px',
@@ -2288,22 +2299,22 @@ export default function App() {
       loose: '1.8'
     };
 
-    const fSize = fontSizeMap[config.fontSize] || '13px';
-    const lSpacing = lineSpacingMap[config.lineSpacing] || '1.4';
+    const fSize = fontSizeMap[activeConfig.fontSize] || '13px';
+    const lSpacing = lineSpacingMap[activeConfig.lineSpacing] || '1.4';
 
     const dateStr = order.created_at 
       ? new Date(order.created_at).toLocaleString('hu-HU') 
       : new Date().toLocaleString('hu-HU');
 
     const renderLogoHtml = () => {
-      if (!config.logoBase64) return '';
-      const alignStyle = config.logoAlignment === 'center' 
+      if (!activeConfig.logoBase64) return '';
+      const alignStyle = activeConfig.logoAlignment === 'center' 
         ? 'margin: 0 auto; display: block;' 
-        : config.logoAlignment === 'right' 
+        : activeConfig.logoAlignment === 'right' 
           ? 'margin: 0 0 0 auto; display: block;' 
           : 'margin: 0 auto 0 0; display: block;';
-      return `<div style="padding: 6px 0; text-align: ${config.logoAlignment};">
-        <img src="${config.logoBase64}" style="max-width: ${config.logoScale}%; height: auto; ${alignStyle}" />
+      return `<div style="padding: 6px 0; text-align: ${activeConfig.logoAlignment};">
+        <img src="${activeConfig.logoBase64}" style="max-width: ${activeConfig.logoScale}%; height: auto; ${alignStyle}" />
       </div>`;
     };
 
@@ -2328,7 +2339,7 @@ export default function App() {
             font-family: 'Courier New', Courier, monospace;
             width: 72mm;
             margin: 0;
-            padding: 4mm 3mm 4mm 6mm; /* Margó eltolása jobbra, hogy ne vágja le a betűket a nyomtató */
+            padding: 4mm 3mm 4mm 6mm;
             font-size: ${fSize};
             line-height: ${lSpacing};
             color: #000;
@@ -2346,18 +2357,18 @@ export default function App() {
         </style>
       </head>
       <body>
-        ${config.logoPosition === 'top' ? renderLogoHtml() : ''}
+        ${activeConfig.logoPosition === 'top' ? renderLogoHtml() : ''}
         
-        ${config.headerText ? `<div class="text-center pre-wrap bold" style="margin-bottom: 8px;">${config.headerText}</div>` : ''}
+        ${activeConfig.headerText ? `<div class="text-center pre-wrap bold" style="margin-bottom: 8px;">${activeConfig.headerText}</div>` : ''}
         
-        ${config.logoPosition === 'before_items' ? renderLogoHtml() : ''}
+        ${activeConfig.logoPosition === 'before_items' ? renderLogoHtml() : ''}
         
         <div class="divider"></div>
         
-        ${config.showOrderId ? `<div><span class="bold">Nyugtaszám:</span> #${order.id}</div>` : ''}
-        ${config.showTimestamp ? `<div><span class="bold">Dátum:</span> ${dateStr}</div>` : ''}
+        ${activeConfig.showOrderId ? `<div><span class="bold">Nyugtaszám:</span> #${order.id}</div>` : ''}
+        ${activeConfig.showTimestamp ? `<div><span class="bold">Dátum:</span> ${dateStr}</div>` : ''}
         <div><span class="bold">Kiszolgáló:</span> ${order.created_by_user || 'Rendszer'}</div>
-        ${config.showPaymentMethod ? `<div><span class="bold">Fizetési mód:</span> ${order.payment_method}</div>` : ''}
+        ${activeConfig.showPaymentMethod ? `<div><span class="bold">Fizetési mód:</span> ${order.payment_method}</div>` : ''}
         
         <div class="divider"></div>
         
@@ -2407,19 +2418,19 @@ export default function App() {
             <td>Részösszeg:</td>
             <td align="right">${subtotal.toLocaleString()} Ft</td>
           </tr>
-          ${config.showPackagingFee && packagingTotal > 0 ? `
+          ${activeConfig.showPackagingFee && packagingTotal > 0 ? `
             <tr>
               <td>Csomagolási díj:</td>
               <td align="right">${packagingTotal.toLocaleString()} Ft</td>
             </tr>
           ` : ''}
-          ${config.showDeliveryFee && order.delivery_fee > 0 ? `
+          ${activeConfig.showDeliveryFee && order.delivery_fee > 0 ? `
             <tr>
               <td>Szállítási díj:</td>
               <td align="right">${order.delivery_fee.toLocaleString()} Ft</td>
             </tr>
           ` : ''}
-          ${config.showDiscount && discountAmount > 0 ? `
+          ${activeConfig.showDiscount && discountAmount > 0 ? `
             <tr style="color: #000;">
               <td>Kedvezmény (${order.discount_percentage}%):</td>
               <td align="right">-${Math.round(discountAmount).toLocaleString()} Ft</td>
@@ -2431,44 +2442,47 @@ export default function App() {
           </tr>
         </table>
         
-        ${config.showCustomerDetails && order.customer_address && order.customer_address !== 'Helyben fogyasztás' ? `
+        ${activeConfig.showCustomerDetails && order.customer_address && order.customer_address !== 'Helyben fogyasztás' ? `
           <div class="divider"></div>
           <div class="bold">Kiszállítási Cím:</div>
           <div>Vevő: ${order.customer_name}</div>
           <div class="bold" style="font-size: calc(${fSize} + 1px);">${order.customer_address}</div>
-          ${config.showComment && order.split_details?.delivery_instructions ? `
+          ${activeConfig.showComment && order.split_details?.delivery_instructions ? `
             <div style="font-size: 90%; font-style: italic;">Megjegyzés: ${order.split_details.delivery_instructions}</div>
           ` : ''}
         ` : ''}
         
         <div class="double-divider"></div>
         
-        ${config.logoPosition === 'bottom' ? renderLogoHtml() : ''}
+        ${activeConfig.logoPosition === 'bottom' ? renderLogoHtml() : ''}
         
-        ${config.footerText ? `<div class="text-center pre-wrap bold" style="margin-top: 8px;">${config.footerText}</div>` : ''}
+        ${activeConfig.footerText ? `<div class="text-center pre-wrap bold" style="margin-top: 8px;">${activeConfig.footerText}</div>` : ''}
       </body>
       </html>
     `;
   };
 
   const printOrderReceipt = (order: any) => {
-    const html = generateReceiptHtml(order);
-    if (window.electronAPI?.printReceipt) {
-      const isSilent = db.receiptConfig?.silentPrint !== false;
-      window.electronAPI.printReceipt(html, db.selectedPrinter, isSilent)
-        .then((res: any) => {
-          if (res && !res.success) {
-            console.error("Nyomtatási hiba:", res.error);
-            alert("Sikertelen nyomtatás: " + res.error);
-          }
-        })
-        .catch((err: any) => {
-          console.error("Nyomtatási hiba:", err);
-        });
-    } else {
-      console.log("Nyomtatási feladat szimuláció:", db.selectedPrinter);
-      console.log(html);
-    }
+    const configs = getReceiptConfigs();
+    configs.forEach((cfg) => {
+      const html = generateReceiptHtml(order, cfg);
+      const isSilent = cfg.silentPrint !== false;
+      if (window.electronAPI?.printReceipt) {
+        window.electronAPI.printReceipt(html, db.selectedPrinter, isSilent)
+          .then((res: any) => {
+            if (res && !res.success) {
+              console.error(`Nyomtatási hiba (${cfg.name}):`, res.error);
+              alert(`Sikertelen nyomtatás (${cfg.name}): ` + res.error);
+            }
+          })
+          .catch((err: any) => {
+            console.error(`Nyomtatási hiba (${cfg.name}):`, err);
+          });
+      } else {
+        console.log(`Nyomtatási feladat szimuláció (${cfg.name}):`, db.selectedPrinter);
+        console.log(html);
+      }
+    });
   };
 
   // Submit Order
@@ -8143,32 +8157,19 @@ export default function App() {
 
               {/* TAB: DISPATCH */}
               {adminTab === 'dispatch' && (() => {
-                const config = db.receiptConfig || {
-                  logoBase64: '',
-                  logoAlignment: 'center',
-                  logoPosition: 'top',
-                  logoScale: 50,
-                  headerText: 'PRÉMIUM PIZZÉRIA & ÉTTEREM\nTel: +36 30 123 4567\nAdószám: 12345678-2-12',
-                  footerText: 'Köszönjük a vásárlást!\nEgészségére!\nVárjuk vissza!',
-                  showOrderId: true,
-                  showTimestamp: true,
-                  showPaymentMethod: true,
-                  showCustomerDetails: true,
-                  showComment: true,
-                  showPackagingFee: true,
-                  showDeliveryFee: true,
-                  showDiscount: true,
-                  fontSize: 'medium',
-                  lineSpacing: 'normal'
-                };
+                const configs = getReceiptConfigs();
+                const activeIndex = Math.max(0, Math.min(selectedConfigIndex, configs.length - 1));
+                const config = configs[activeIndex] || configs[0];
 
                 const updateConfig = (key: string, value: any) => {
+                  const updatedConfigs = [...configs];
+                  updatedConfigs[activeIndex] = {
+                    ...config,
+                    [key]: value
+                  };
                   saveDatabase({
                     ...db,
-                    receiptConfig: {
-                      ...config,
-                      [key]: value
-                    }
+                    receiptConfigs: updatedConfigs
                   });
                 };
 
@@ -8181,6 +8182,28 @@ export default function App() {
                     };
                     reader.readAsDataURL(file);
                   }
+                };
+
+                const handleAddConfig = () => {
+                  const newCfg = {
+                    ...config,
+                    name: `${configs.length + 1}. Példány (Új)`,
+                  };
+                  saveDatabase({
+                    ...db,
+                    receiptConfigs: [...configs, newCfg]
+                  });
+                  setSelectedConfigIndex(configs.length);
+                };
+
+                const handleDeleteConfig = (idx: number) => {
+                  if (configs.length <= 1) return;
+                  const updatedConfigs = configs.filter((_, i) => i !== idx);
+                  saveDatabase({
+                    ...db,
+                    receiptConfigs: updatedConfigs
+                  });
+                  setSelectedConfigIndex(Math.max(0, idx - 1));
                 };
 
                 // Mock order for live preview and test printing
@@ -8371,6 +8394,76 @@ export default function App() {
                         <FileText size={18} color="#bf5af2" />
                         Epson TM-T20II Nyugtaszerkesztő & Blokkdizájn
                       </span>
+
+                      {/* Nyomtatandó példányok (Tabs) */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '12px', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', width: '100%' }}>
+                          {configs.map((cfg, idx) => (
+                            <div 
+                              key={idx} 
+                              onClick={() => setSelectedConfigIndex(idx)}
+                              style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '6px',
+                                background: selectedConfigIndex === idx ? 'var(--primary)' : 'rgba(255,255,255,0.04)',
+                                border: '1px solid ' + (selectedConfigIndex === idx ? 'var(--primary)' : 'rgba(255,255,255,0.08)'),
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                color: 'white',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              <span>{cfg.name || `${idx + 1}. Példány`}</span>
+                              {configs.length > 1 && (
+                                <span 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteConfig(idx);
+                                  }}
+                                  style={{ 
+                                    color: 'rgba(255,255,255,0.6)', 
+                                    marginLeft: '4px',
+                                    fontSize: '11px', 
+                                    cursor: 'pointer',
+                                    padding: '0 4px',
+                                    borderRadius: '4px',
+                                    background: 'rgba(0,0,0,0.15)'
+                                  }}
+                                  title="Példány törlése"
+                                >
+                                  ✕
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                          <button 
+                            className="btn" 
+                            onClick={handleAddConfig}
+                            style={{ padding: '6px 12px', fontSize: '12px', background: 'rgba(48, 209, 88, 0.15)', color: '#30d158', border: '1px solid rgba(48, 209, 88, 0.25)', borderRadius: '8px' }}
+                          >
+                            + Új Példány
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Példány egyedi neve szerkesztő */}
+                      <div style={{ display: 'flex', gap: '14px', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                        <div style={{ flex: 1 }}>
+                          <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Aktív Példány megnevezése (pl. Vendégblokk, Konyhai rendelés, Futárblokk)</label>
+                          <input 
+                            type="text" 
+                            value={config.name || ''} 
+                            onChange={e => updateConfig('name', e.target.value)}
+                            className="input-field"
+                            style={{ width: '100%', height: '34px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)', color: 'white', borderRadius: '6px', padding: '0 8px', fontSize: '12px' }}
+                            placeholder="E.g. Vendégblokk"
+                          />
+                        </div>
+                      </div>
 
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '30px', marginTop: '10px' }}>
                         {/* Bal Oszlop - Beállítások */}
