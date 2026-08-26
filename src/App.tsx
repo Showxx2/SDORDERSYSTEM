@@ -2323,11 +2323,12 @@ export default function App() {
         <meta charset="utf-8">
         <style>
           @page { margin: 0; }
+          * { box-sizing: border-box; }
           body {
             font-family: 'Courier New', Courier, monospace;
             width: 72mm;
             margin: 0;
-            padding: 4mm 2mm;
+            padding: 4mm 3mm 4mm 6mm; /* Margó eltolása jobbra, hogy ne vágja le a betűket a nyomtató */
             font-size: ${fSize};
             line-height: ${lSpacing};
             color: #000;
