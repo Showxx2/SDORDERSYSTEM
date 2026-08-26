@@ -6664,8 +6664,8 @@ export default function App() {
                           <table className="admin-table">
                             <thead>
                               <tr>
-                                <th>Kategória</th>
                                 <th>Étel név</th>
+                                <th>Kategória</th>
                                 <th>Ár</th>
                                 <th>Csomagolás</th>
                                 <th>Láthatóság</th>
@@ -6706,10 +6706,6 @@ export default function App() {
 
                                   return (
                                   <tr key={item.id} style={{ opacity: isRowFaded ? 0.4 : 1, transition: 'opacity 0.2s ease' }}>
-                                    <td style={{ fontWeight: 600 }}>
-                                      {cat?.name || 'Ismeretlen'}
-                                      {isCatHidden && <span style={{ display: 'block', fontSize: '10px', color: 'var(--danger)', fontWeight: 500 }}>(Rejtett kategória)</span>}
-                                    </td>
                                     <td>
                                       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                                         <strong style={{ color: 'white' }}>{item.name}</strong>
@@ -6733,6 +6729,10 @@ export default function App() {
                                           </div>
                                         )}
                                       </div>
+                                    </td>
+                                    <td style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>
+                                      {cat?.name || 'Ismeretlen'}
+                                      {isCatHidden && <span style={{ display: 'block', fontSize: '10px', color: 'var(--danger)', fontWeight: 500 }}>(Rejtett kategória)</span>}
                                     </td>
                                     <td>{item.price.toLocaleString()} FT</td>
                                     <td>
