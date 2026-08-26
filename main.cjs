@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 
 let mainWindow;
+let server = null;
 
 // Path for our local database file
 const dbPath = path.join(app.getPath('userData'), 'ordersystem_db.json');
