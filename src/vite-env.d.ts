@@ -3,6 +3,6 @@ interface Window {
     dbLoad: () => Promise<any>;
     dbSave: (data: any) => Promise<{ success: boolean; error?: string }>;
     getPrinters?: () => Promise<any[]>;
-    printReceipt?: (htmlContent: string, printerName?: string) => Promise<{ success: boolean; error?: string }>;
+    printReceipt?: (htmlContent: string, printerName?: string, silentParam?: boolean) => Promise<{ success: boolean; error?: string }>;
   };
 }

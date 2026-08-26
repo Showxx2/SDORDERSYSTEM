@@ -294,7 +294,11 @@ ipcMain.handle('db-save', async (event, data) => {
 ipcMain.handle('get-printers', async () => {
   if (mainWindow) {
     try {
-      return await mainWindow.webContents.getPrintersAsync();
+      if (mainWindow.webContents.getPrintersAsync) {
+        return await mainWindow.webContents.getPrintersAsync();
+      } else if (mainWindow.webContents.getPrinters) {
+        return mainWindow.webContents.getPrinters();
+      }
     } catch (err) {
       console.error("Error getting printers in main process:", err);
       return [];
@@ -303,7 +307,8 @@ ipcMain.handle('get-printers', async () => {
   return [];
 });
 
-ipcMain.handle('print-receipt', async (event, htmlContent, printerName) => {
+ipcMain.handle('print-receipt', async (event, htmlContent, printerName, silentParam) => {
+  const isSilent = silentParam !== false;
   return new Promise((resolve) => {
     try {
       let workerWindow = new BrowserWindow({
@@ -317,22 +322,52 @@ ipcMain.handle('print-receipt', async (event, htmlContent, printerName) => {
       workerWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
       
       workerWindow.webContents.on('did-finish-load', () => {
-        workerWindow.webContents.print({
-          silent: true,
+        const tryPrint = (options, attemptNum) => {
+          workerWindow.webContents.print(options, (success, failureReason) => {
+            if (success) {
+              workerWindow.close();
+              resolve({ success: true });
+            } else {
+              console.error(`Nyomtatási kísérlet ${attemptNum} sikertelen:`, failureReason);
+              
+              if (attemptNum === 1) {
+                // Kísérlet 2: printBackground kikapcsolása (sok monokróm/hőpapír nyomtató ezt nem szereti)
+                console.log("Második kísérlet (printBackground: false)...");
+                tryPrint({
+                  silent: isSilent,
+                  printBackground: false,
+                  deviceName: printerName || undefined
+                }, 2);
+              } else if (attemptNum === 2) {
+                // Kísérlet 3: Minimális beállítások
+                console.log("Harmadik kísérlet (minimális beállítások)...");
+                tryPrint({
+                  silent: isSilent,
+                  deviceName: printerName || undefined
+                }, 3);
+              } else if (attemptNum === 3 && printerName) {
+                // Kísérlet 4: Próbáljuk meg az alapértelmezett nyomtatóra küldeni, ha az egyedi név hibás volt
+                console.log("Negyedik kísérlet (alapértelmezett nyomtató)...");
+                tryPrint({
+                  silent: isSilent
+                }, 4);
+              } else {
+                workerWindow.close();
+                resolve({ success: false, error: failureReason });
+              }
+            }
+          });
+        };
+
+        // Első kísérlet
+        tryPrint({
+          silent: isSilent,
           printBackground: true,
           deviceName: printerName || undefined
-        }, (success, failureReason) => {
-          workerWindow.close();
-          if (success) {
-            resolve({ success: true });
-          } else {
-            console.error("Silent printing failed:", failureReason);
-            resolve({ success: false, error: failureReason });
-          }
-        });
+        }, 1);
       });
     } catch (err) {
-      console.error("Silent printing error:", err);
+      console.error("Nyomtatási hiba:", err);
       resolve({ success: false, error: err.message });
     }
   });

@@ -2453,7 +2453,8 @@ export default function App() {
   const printOrderReceipt = (order: any) => {
     const html = generateReceiptHtml(order);
     if (window.electronAPI?.printReceipt) {
-      window.electronAPI.printReceipt(html, db.selectedPrinter)
+      const isSilent = db.receiptConfig?.silentPrint !== false;
+      window.electronAPI.printReceipt(html, db.selectedPrinter, isSilent)
         .then((res: any) => {
           if (res && !res.success) {
             console.error("Nyomtatási hiba:", res.error);
@@ -8277,6 +8278,20 @@ export default function App() {
                             type="checkbox"
                             checked={db.autoPrintOnOrder !== false}
                             onChange={e => saveDatabase({ ...db, autoPrintOnOrder: e.target.checked })}
+                            style={{ width: '20px', height: '20px', accentColor: '#0a84ff', cursor: 'pointer' }}
+                          />
+                        </div>
+
+                        {/* Csendes Nyomtatás Toggle */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                          <div>
+                            <span style={{ fontWeight: 600, fontSize: '13px', display: 'block' }}>Csendes nyomtatás (Silent mode)</span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Bekapcsolva közvetlenül a nyomtatóra küldi a feladatot. Kikapcsolva megnyitja a Windows nyomtatási párbeszédpanelt a kézi vezérléshez és hibakereséshez.</span>
+                          </div>
+                          <input 
+                            type="checkbox"
+                            checked={config.silentPrint !== false}
+                            onChange={e => updateConfig('silentPrint', e.target.checked)}
                             style={{ width: '20px', height: '20px', accentColor: '#0a84ff', cursor: 'pointer' }}
                           />
                         </div>
