@@ -2387,21 +2387,46 @@ export default function App() {
                 ? `${item.name || item.item_name} (Menü)`
                 : (item.name || item.item_name);
               
-              let subnotes = '';
+              let subnotes: string[] = [];
               if (item.custom_modifications) {
                 const mods = item.custom_modifications;
-                if (mods.portion === 'half') subnotes += ' [Fél adag]';
+                if (mods.portion === 'half') {
+                  subnotes.push('⚠️ FÉL ADAG');
+                }
+                
                 if (mods.selected_courses) {
                   const courseNames = mods.selected_courses.map((c: any) => c.itemName).join(', ');
-                  subnotes += ` (${courseNames})`;
+                  subnotes.push(`🍲 MENÜ VÁLASZTÁS: ${courseNames.toUpperCase()}`);
+                }
+
+                if (mods.ingredient_adjustments) {
+                  Object.entries(mods.ingredient_adjustments).forEach(([ingIdStr, status]) => {
+                    const ingId = parseInt(ingIdStr);
+                    const ingredient = db.inventory.find((i: any) => i.id === ingId);
+                    if (ingredient) {
+                      if (status === 'none') {
+                        subnotes.push(`❌ NÉLKÜL: ${ingredient.name.toUpperCase()}`);
+                      } else if (status === 'double') {
+                        subnotes.push(`➕ DUPLA: ${ingredient.name.toUpperCase()}`);
+                      }
+                    }
+                  });
+                }
+
+                if (mods.note && mods.note.trim()) {
+                  subnotes.push(`💬 MEGJEGYZÉS: ${mods.note.trim().toUpperCase()}`);
                 }
               }
               
               return `
                 <tr>
                   <td>
-                    <div>${name}</div>
-                    ${subnotes ? `<div style="font-size: 85%; padding-left: 4px; font-style: italic;">${subnotes}</div>` : ''}
+                    <div style="font-weight: bold;">${name}</div>
+                    ${subnotes.length > 0 ? `
+                      <div style="font-size: 85%; padding-left: 6px; margin-top: 3px; font-weight: bold; border-left: 2px solid #000; line-height: 1.2;">
+                        ${subnotes.map(note => `<div style="margin-top: 1px;">${note}</div>`).join('')}
+                      </div>
+                    ` : ''}
                   </td>
                   <td align="center">${item.quantity}</td>
                   <td align="right">${(price * item.quantity).toLocaleString()} Ft</td>
@@ -8221,8 +8246,29 @@ export default function App() {
                     delivery_instructions: 'Csengő a kapun balra, kérem hívjon érkezéskor.'
                   },
                   items: [
-                    { item_name: 'Margherita Pizza', quantity: 1, price_at_order: 1890, packaging_fee_at_order: 150 },
-                    { item_name: 'Bolognai Spagetti', quantity: 2, price_at_order: 2290, packaging_fee_at_order: 200 }
+                    { 
+                      name: 'Margherita Pizza', 
+                      quantity: 1, 
+                      price_at_order: 1890, 
+                      packaging_fee_at_order: 150,
+                      custom_modifications: {
+                        portion: 'full',
+                        ingredient_adjustments: {
+                          1: 'none',
+                          3: 'double'
+                        },
+                        note: 'Ropogósra sütve'
+                      }
+                    },
+                    { 
+                      name: 'Bolognai Spagetti', 
+                      quantity: 2, 
+                      price_at_order: 2290, 
+                      packaging_fee_at_order: 200,
+                      custom_modifications: {
+                        portion: 'half'
+                      }
+                    }
                   ]
                 };
 
@@ -8706,21 +8752,50 @@ export default function App() {
                             </div>
 
                             {/* Table Items */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <div style={{ display: 'flex' }}>
-                                  <span style={{ flex: 1 }}>Margherita Pizza</span>
-                                  <span style={{ width: '40px', textAlign: 'center' }}>1</span>
-                                  <span style={{ width: '80px', textAlign: 'right' }}>1 890 Ft</span>
-                                </div>
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                                <div style={{ display: 'flex' }}>
-                                  <span style={{ flex: 1 }}>Bolognai Spagetti</span>
-                                  <span style={{ width: '40px', textAlign: 'center' }}>2</span>
-                                  <span style={{ width: '80px', textAlign: 'right' }}>4 580 Ft</span>
-                                </div>
-                              </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              {previewOrder.items.map((item: any, idx: number) => {
+                                const price = item.price_at_order;
+                                let subnotes: string[] = [];
+                                if (item.custom_modifications) {
+                                  const mods = item.custom_modifications;
+                                  if (mods.portion === 'half') {
+                                    subnotes.push('⚠️ FÉL ADAG');
+                                  }
+                                  if (mods.ingredient_adjustments) {
+                                    Object.entries(mods.ingredient_adjustments).forEach(([ingIdStr, status]) => {
+                                      const ingId = parseInt(ingIdStr);
+                                      const ingredient = db.inventory.find((i: any) => i.id === ingId);
+                                      if (ingredient) {
+                                        if (status === 'none') {
+                                          subnotes.push(`❌ NÉLKÜL: ${ingredient.name.toUpperCase()}`);
+                                        } else if (status === 'double') {
+                                          subnotes.push(`➕ DUPLA: ${ingredient.name.toUpperCase()}`);
+                                        }
+                                      }
+                                    });
+                                  }
+                                  if (mods.note && mods.note.trim()) {
+                                    subnotes.push(`💬 MEGJEGYZÉS: ${mods.note.trim().toUpperCase()}`);
+                                  }
+                                }
+
+                                return (
+                                  <div key={idx} style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <div style={{ display: 'flex' }}>
+                                      <span style={{ flex: 1, fontWeight: 'bold' }}>{item.name}</span>
+                                      <span style={{ width: '40px', textAlign: 'center' }}>{item.quantity}</span>
+                                      <span style={{ width: '80px', textAlign: 'right' }}>{(price * item.quantity).toLocaleString()} Ft</span>
+                                    </div>
+                                    {subnotes.length > 0 && (
+                                      <div style={{ fontSize: '85%', paddingLeft: '6px', marginTop: '2px', borderLeft: '2px solid #000', fontWeight: 'bold', lineHeight: '1.2' }}>
+                                        {subnotes.map((n, i) => (
+                                          <div key={i}>{n}</div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
 
                             <div style={{ borderTop: '1px dashed #000000', margin: '8px 0' }}></div>
