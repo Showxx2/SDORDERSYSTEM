@@ -2384,8 +2384,8 @@ export default function App() {
             ${order.items.map((item: any) => {
               const price = item.custom_modifications ? item.custom_modifications.calculated_price : item.price_at_order;
               const name = item.custom_modifications?.is_menu_order 
-                ? `${item.item_name} (Menü)`
-                : item.item_name;
+                ? `${item.name || item.item_name} (Menü)`
+                : (item.name || item.item_name);
               
               let subnotes = '';
               if (item.custom_modifications) {
