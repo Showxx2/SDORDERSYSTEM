@@ -3988,7 +3988,7 @@ export default function App() {
       </nav>
 
       {/* Main Content View Switcher */}
-      <main className="main-content" style={{ display: 'flex', width: '100%', height: '100%', overflow: 'hidden' }}>
+      <main className="main-content" style={{ display: 'flex', width: '100%', height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
         
         {/* Left Side: Main Application */}
         <div style={{ 
@@ -6755,7 +6755,7 @@ export default function App() {
                                     <td style={{ textAlign: 'right', verticalAlign: 'middle' }}>
                                       <button 
                                         className="btn" 
-                                        style={{ padding: '6px 12px', fontSize: '12px', marginRight: '6px' }}
+                                        style={{ padding: '6px 14px', fontSize: '12px', background: 'rgba(255,255,255,0.06)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', marginRight: '6px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s ease' }}
                                         onClick={() => {
                                           setEditingItem(item);
                                           setNewItemName(item.name);
@@ -6774,11 +6774,11 @@ export default function App() {
                                           }
                                         }}
                                       >
-                                        Szerkeszt
+                                        Szerkesztés
                                       </button>
                                       <button 
-                                        className="btn btn-danger" 
-                                        style={{ padding: '6px 12px', fontSize: '12px' }}
+                                        className="btn" 
+                                        style={{ padding: '6px 14px', fontSize: '12px', background: 'rgba(255,69,58,0.12)', color: '#ff453a', border: '1px solid rgba(255,69,58,0.25)', borderRadius: '20px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s ease' }}
                                         onClick={() => {
                                           if (window.confirm(`Biztosan törlöd a(z) "${item.name}" ételt?`)) {
                                             const updated = db.items.filter((i: any) => i.id !== item.id);
@@ -6786,7 +6786,7 @@ export default function App() {
                                           }
                                         }}
                                       >
-                                        Töröl
+                                        Törlés
                                       </button>
                                     </td>
                                   </tr>
@@ -6835,7 +6835,7 @@ export default function App() {
                                     <td style={{ textAlign: 'right' }}>
                                       <button 
                                         className="btn" 
-                                        style={{ padding: '6px 12px', fontSize: '12px', marginRight: '6px' }}
+                                        style={{ padding: '6px 14px', fontSize: '12px', background: 'rgba(255,255,255,0.06)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', marginRight: '6px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s ease' }}
                                         onClick={() => {
                                           setEditingCategory(cat);
                                           setNewCatName(cat.name);
@@ -6844,11 +6844,11 @@ export default function App() {
                                           setNewCatIncludeLinkedPackagingFee(cat.include_linked_packaging_fee || false);
                                         }}
                                       >
-                                        Szerkeszt
+                                        Szerkesztés
                                       </button>
                                       <button 
-                                        className="btn btn-danger" 
-                                        style={{ padding: '6px 12px', fontSize: '12px' }}
+                                        className="btn" 
+                                        style={{ padding: '6px 14px', fontSize: '12px', background: 'rgba(255,69,58,0.12)', color: '#ff453a', border: '1px solid rgba(255,69,58,0.25)', borderRadius: '20px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s ease' }}
                                         onClick={() => {
                                           if (window.confirm(`Biztosan törlöd a(z) "${cat.name}" kategóriát? A benne lévő ételek kategória nélkül maradnak.`)) {
                                             const updated = db.categories.filter((c: any) => c.id !== cat.id);
@@ -6856,7 +6856,7 @@ export default function App() {
                                           }
                                         }}
                                       >
-                                        Töröl
+                                        Törlés
                                       </button>
                                     </td>
                                   </tr>
