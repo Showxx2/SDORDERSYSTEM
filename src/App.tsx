@@ -2288,6 +2288,8 @@ export default function App() {
 
   const generateReceiptHtml = (order: any, config?: any) => {
     const activeConfig = config || getReceiptConfigs()[0];
+    const layout = activeConfig.layoutPreset || 'classic'; // 'classic' | 'delivery' | 'kitchen' | 'minimal'
+
     const fontSizeMap: Record<string, string> = {
       small: '11px',
       medium: '13px',
@@ -2307,7 +2309,7 @@ export default function App() {
       : new Date().toLocaleString('hu-HU');
 
     const renderLogoHtml = () => {
-      if (!activeConfig.logoBase64) return '';
+      if (!activeConfig.logoBase64 || layout === 'kitchen') return '';
       const alignStyle = activeConfig.logoAlignment === 'center' 
         ? 'margin: 0 auto; display: block;' 
         : activeConfig.logoAlignment === 'right' 
@@ -2327,57 +2329,49 @@ export default function App() {
     }, 0);
     const discountAmount = (subtotal + packagingTotal) * ((order.discount_percentage || 0) / 100);
 
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <style>
-          @page { margin: 0; }
-          * { box-sizing: border-box; }
-          body {
-            font-family: 'Courier New', Courier, monospace;
-            width: 72mm;
-            margin: 0;
-            padding: 4mm 3mm 4mm 6mm;
-            font-size: ${fSize};
-            line-height: ${lSpacing};
-            color: #000;
-            background: #fff;
-          }
-          .text-center { text-align: center; }
-          .text-right { text-align: right; }
-          .bold { font-weight: bold; }
-          .divider { border-top: 1px dashed #000; margin: 8px 0; }
-          .double-divider { border-top: 2px double #000; margin: 8px 0; }
-          .items-table { width: 100%; border-collapse: collapse; }
-          .items-table th, .items-table td { padding: 4px 0; vertical-align: top; }
-          .pre-wrap { white-space: pre-wrap; font-family: inherit; margin: 0; }
-          .total-row { font-size: calc(${fSize} + 2px); font-weight: bold; }
-        </style>
-      </head>
-      <body>
+    const renderHeaderBlock = () => {
+      if (layout === 'kitchen') return '';
+      return `
         ${activeConfig.logoPosition === 'top' ? renderLogoHtml() : ''}
-        
         ${activeConfig.headerText ? `<div class="text-center pre-wrap bold" style="margin-bottom: 8px;">${activeConfig.headerText}</div>` : ''}
-        
         ${activeConfig.logoPosition === 'before_items' ? renderLogoHtml() : ''}
-        
-        <div class="divider"></div>
-        
+      `;
+    };
+
+    const renderMetadataBlock = () => {
+      return `
         ${activeConfig.showOrderId ? `<div><span class="bold">Nyugtaszám:</span> #${order.id}</div>` : ''}
         ${activeConfig.showTimestamp ? `<div><span class="bold">Dátum:</span> ${dateStr}</div>` : ''}
         <div><span class="bold">Kiszolgáló:</span> ${order.created_by_user || 'Rendszer'}</div>
-        ${activeConfig.showPaymentMethod ? `<div><span class="bold">Fizetési mód:</span> ${order.payment_method}</div>` : ''}
-        
-        <div class="divider"></div>
-        
+        ${activeConfig.showPaymentMethod && layout !== 'kitchen' ? `<div><span class="bold">Fizetési mód:</span> ${order.payment_method}</div>` : ''}
+      `;
+    };
+
+    const renderCustomerBlock = () => {
+      if (!activeConfig.showCustomerDetails || !order.customer_address || order.customer_address === 'Helyben fogyasztás') return '';
+      
+      const isDeliveryFocused = layout === 'delivery';
+      return `
+        <div style="background: ${isDeliveryFocused ? '#000' : 'transparent'}; color: ${isDeliveryFocused ? '#fff' : '#000'}; padding: ${isDeliveryFocused ? '8px 10px' : '0'}; border: ${isDeliveryFocused ? '3px solid #000' : 'none'}; border-radius: ${isDeliveryFocused ? '6px' : '0'}; margin-bottom: 8px;">
+          <div class="bold" style="font-size: ${isDeliveryFocused ? '120%' : '100%'}; text-transform: uppercase;">🚗 Kiszállítási adatok:</div>
+          <div style="margin-top: 4px;">Vevő: <span class="bold">${order.customer_name}</span></div>
+          <div class="bold" style="font-size: ${isDeliveryFocused ? '135%' : '110%'}; margin-top: 3px; border-bottom: ${isDeliveryFocused ? '1px solid #fff' : 'none'}; padding-bottom: ${isDeliveryFocused ? '4px' : '0'};">${order.customer_address}</div>
+          ${activeConfig.showComment && order.split_details?.delivery_instructions ? `
+            <div style="font-size: 95%; font-style: italic; margin-top: 4px; font-weight: bold;">Megjegyzés: ${order.split_details.delivery_instructions}</div>
+          ` : ''}
+        </div>
+      `;
+    };
+
+    const renderItemsBlock = () => {
+      const showPrices = layout !== 'kitchen';
+      return `
         <table class="items-table">
           <thead>
             <tr style="border-bottom: 1px solid #000;">
               <th align="left" class="bold">Tétel</th>
-              <th align="center" class="bold" style="width: 10%;">Db</th>
-              <th align="right" class="bold" style="width: 25%;">Érték</th>
+              <th align="center" class="bold" style="width: 15%;">Db</th>
+              ${showPrices ? '<th align="right" class="bold" style="width: 30%;">Érték</th>' : ''}
             </tr>
           </thead>
           <tbody>
@@ -2421,23 +2415,26 @@ export default function App() {
               return `
                 <tr>
                   <td>
-                    <div style="font-weight: bold;">${name}</div>
+                    <div style="font-weight: bold; font-size: ${layout === 'kitchen' ? '115%' : '100%'};">${name}</div>
                     ${subnotes.length > 0 ? `
                       <div style="font-size: 85%; padding-left: 6px; margin-top: 3px; font-weight: bold; border-left: 2px solid #000; line-height: 1.2;">
                         ${subnotes.map(note => `<div style="margin-top: 1px;">${note}</div>`).join('')}
                       </div>
                     ` : ''}
                   </td>
-                  <td align="center">${item.quantity}</td>
-                  <td align="right">${(price * item.quantity).toLocaleString()} Ft</td>
+                  <td align="center" style="font-size: ${layout === 'kitchen' ? '120%' : '100%'}; font-weight: bold;">${item.quantity}</td>
+                  ${showPrices ? `<td align="right">${(price * item.quantity).toLocaleString()} Ft</td>` : ''}
                 </tr>
               `;
             }).join('')}
           </tbody>
         </table>
-        
-        <div class="divider"></div>
-        
+      `;
+    };
+
+    const renderTotalsBlock = () => {
+      if (layout === 'kitchen') return '';
+      return `
         <table style="width: 100%;">
           <tr>
             <td>Részösszeg:</td>
@@ -2466,22 +2463,87 @@ export default function App() {
             <td align="right" style="padding-top: 6px;">${order.total_amount.toLocaleString()} Ft</td>
           </tr>
         </table>
-        
-        ${activeConfig.showCustomerDetails && order.customer_address && order.customer_address !== 'Helyben fogyasztás' ? `
-          <div class="divider"></div>
-          <div class="bold">Kiszállítási Cím:</div>
-          <div>Vevő: ${order.customer_name}</div>
-          <div class="bold" style="font-size: calc(${fSize} + 1px);">${order.customer_address}</div>
-          ${activeConfig.showComment && order.split_details?.delivery_instructions ? `
-            <div style="font-size: 90%; font-style: italic;">Megjegyzés: ${order.split_details.delivery_instructions}</div>
-          ` : ''}
-        ` : ''}
-        
-        <div class="double-divider"></div>
-        
+      `;
+    };
+
+    const renderFooterBlock = () => {
+      if (layout === 'kitchen') return '';
+      return `
         ${activeConfig.logoPosition === 'bottom' ? renderLogoHtml() : ''}
-        
         ${activeConfig.footerText ? `<div class="text-center pre-wrap bold" style="margin-top: 8px;">${activeConfig.footerText}</div>` : ''}
+      `;
+    };
+
+    let innerBodyHtml = '';
+    if (layout === 'delivery') {
+      innerBodyHtml = `
+        ${renderCustomerBlock()}
+        <div class="divider"></div>
+        ${renderHeaderBlock()}
+        ${renderMetadataBlock()}
+        <div class="divider"></div>
+        ${renderItemsBlock()}
+        <div class="divider"></div>
+        ${renderTotalsBlock()}
+        <div class="double-divider"></div>
+        ${renderFooterBlock()}
+      `;
+    } else if (layout === 'kitchen') {
+      innerBodyHtml = `
+        <div class="text-center bold" style="font-size: 130%; border: 3px solid #000; padding: 6px; margin-bottom: 8px; text-transform: uppercase;">⚠️ KONYHAI BLOKK ⚠️</div>
+        ${renderMetadataBlock()}
+        ${renderCustomerBlock()}
+        <div class="divider"></div>
+        ${renderItemsBlock()}
+        <div class="double-divider"></div>
+      `;
+    } else {
+      // 'classic' or 'minimal'
+      innerBodyHtml = `
+        ${renderHeaderBlock()}
+        <div class="divider"></div>
+        ${renderMetadataBlock()}
+        <div class="divider"></div>
+        ${renderItemsBlock()}
+        <div class="divider"></div>
+        ${renderTotalsBlock()}
+        ${renderCustomerBlock()}
+        <div class="double-divider"></div>
+        ${renderFooterBlock()}
+      `;
+    }
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          @page { margin: 0; }
+          * { box-sizing: border-box; }
+          body {
+            font-family: 'Courier New', Courier, monospace;
+            width: 72mm;
+            margin: 0;
+            padding: 4mm 3mm 4mm 6mm;
+            font-size: ${fSize};
+            line-height: ${lSpacing};
+            color: #000;
+            background: #fff;
+          }
+          .text-center { text-align: center; }
+          .text-right { text-align: right; }
+          .bold { font-weight: bold; }
+          .divider { border-top: 1px dashed #000; margin: 8px 0; }
+          .double-divider { border-top: 2px double #000; margin: 8px 0; }
+          .items-table { width: 100%; border-collapse: collapse; }
+          .items-table th, .items-table td { padding: 4px 0; vertical-align: top; }
+          .pre-wrap { white-space: pre-wrap; font-family: inherit; margin: 0; }
+          .total-row { font-size: calc(${fSize} + 2px); font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        ${innerBodyHtml}
       </body>
       </html>
     `;
@@ -8496,10 +8558,10 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* Példány egyedi neve szerkesztő */}
-                      <div style={{ display: 'flex', gap: '14px', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', border: '1px solid rgba(255,255,255,0.04)' }}>
-                        <div style={{ flex: 1 }}>
-                          <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Aktív Példány megnevezése (pl. Vendégblokk, Konyhai rendelés, Futárblokk)</label>
+                      {/* Példány egyedi neve és stílus szerkesztő */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', background: 'rgba(255,255,255,0.02)', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Aktív Példány megnevezése (pl. Vendégblokk, Konyha, Futár)</label>
                           <input 
                             type="text" 
                             value={config.name || ''} 
@@ -8508,6 +8570,19 @@ export default function App() {
                             style={{ width: '100%', height: '34px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)', color: 'white', borderRadius: '6px', padding: '0 8px', fontSize: '12px' }}
                             placeholder="E.g. Vendégblokk"
                           />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Nyomtatási Elrendezés Stílus</label>
+                          <select
+                            value={config.layoutPreset || 'classic'}
+                            onChange={e => updateConfig('layoutPreset', e.target.value)}
+                            className="input-field"
+                            style={{ width: '100%', height: '34px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)', color: 'white', borderRadius: '6px', padding: '0 8px', fontSize: '12px' }}
+                          >
+                            <option value="classic" style={{ background: '#1c1c1e' }}>Klasszikus Éttermi (Standard)</option>
+                            <option value="delivery" style={{ background: '#1c1c1e' }}>Futár-fókuszú (Cím legfelül)</option>
+                            <option value="kitchen" style={{ background: '#1c1c1e' }}>Konyhai bizonylat (Csak ételek & árak nélkül)</option>
+                          </select>
                         </div>
                       </div>
 
@@ -8686,7 +8761,6 @@ export default function App() {
                             <FileText size={16} />
                             Tesztblokk Nyomtatása
                           </button>
-
                         </div>
 
                         {/* Jobb Oszlop - Epson TM-T20II Élő előnézet (80mm) */}
@@ -8713,153 +8787,198 @@ export default function App() {
                               userSelect: 'none'
                             }}
                           >
-                            {/* Logo Top */}
-                            {config.logoPosition === 'top' && config.logoBase64 && (
-                              <div style={{ textAlign: config.logoAlignment as any, padding: '4px 0 10px 0' }}>
-                                <img src={config.logoBase64} style={{ maxWidth: `${config.logoScale}%`, height: 'auto' }} />
-                              </div>
-                            )}
+                            {/* Render Preview according to Layout Preset */}
+                            {(() => {
+                              const layout = config.layoutPreset || 'classic';
+                              const showPrices = layout !== 'kitchen';
 
-                            {/* Header */}
-                            {config.headerText && (
-                              <div style={{ textAlign: 'center', fontWeight: 'bold', whiteSpace: 'pre-wrap', marginBottom: '8px' }}>
-                                {config.headerText}
-                              </div>
-                            )}
+                              const previewLogo = config.logoBase64 && layout !== 'kitchen' ? (
+                                <div style={{ textAlign: config.logoAlignment as any, padding: '4px 0 10px 0' }}>
+                                  <img src={config.logoBase64} style={{ maxWidth: `${config.logoScale}%`, height: 'auto' }} />
+                                </div>
+                              ) : null;
 
-                            {/* Logo Before Items */}
-                            {config.logoPosition === 'before_items' && config.logoBase64 && (
-                              <div style={{ textAlign: config.logoAlignment as any, padding: '4px 0 10px 0' }}>
-                                <img src={config.logoBase64} style={{ maxWidth: `${config.logoScale}%`, height: 'auto' }} />
-                              </div>
-                            )}
+                              const previewHeader = config.headerText && layout !== 'kitchen' ? (
+                                <div style={{ textAlign: 'center', fontWeight: 'bold', whiteSpace: 'pre-wrap', marginBottom: '8px' }}>
+                                  {config.headerText}
+                                </div>
+                              ) : null;
 
-                            <div style={{ borderTop: '1px dashed #000000', margin: '8px 0' }}></div>
+                              const previewMetadata = (
+                                <>
+                                  {config.showOrderId && <div><strong>Nyugtaszám:</strong> #1234</div>}
+                                  {config.showTimestamp && <div><strong>Dátum:</strong> {new Date().toLocaleString('hu-HU')}</div>}
+                                  <div><strong>Kiszolgáló:</strong> Rendszergazda</div>
+                                  {config.showPaymentMethod && layout !== 'kitchen' && <div><strong>Fizetési mód:</strong> {previewOrder.payment_method}</div>}
+                                </>
+                              );
 
-                            {/* Metadata */}
-                            {config.showOrderId && <div><strong>Nyugtaszám:</strong> #1234</div>}
-                            {config.showTimestamp && <div><strong>Dátum:</strong> {new Date().toLocaleString('hu-HU')}</div>}
-                            <div><strong>Kiszolgáló:</strong> Rendszergazda</div>
-                            {config.showPaymentMethod && <div><strong>Fizetési mód:</strong> {previewOrder.payment_method}</div>}
+                              const previewCustomer = config.showCustomerDetails ? (
+                                <div style={{ 
+                                  background: layout === 'delivery' ? '#000' : 'transparent',
+                                  color: layout === 'delivery' ? '#fff' : '#000',
+                                  padding: layout === 'delivery' ? '6px 8px' : '0',
+                                  border: layout === 'delivery' ? '2px solid #000' : 'none',
+                                  borderRadius: layout === 'delivery' ? '4px' : '0',
+                                  marginTop: '6px',
+                                  marginBottom: '6px'
+                                }}>
+                                  <div style={{ fontWeight: 'bold', fontSize: layout === 'delivery' ? '110%' : '100%', textTransform: 'uppercase' }}>🚗 Kiszállítási adatok:</div>
+                                  <div>Vevő: Kovács János</div>
+                                  <div style={{ fontWeight: 'bold', fontSize: layout === 'delivery' ? '120%' : '105%' }}>8900 Zalaegerszeg, Kossuth Lajos utca 12.</div>
+                                  {config.showComment && (
+                                    <div style={{ fontSize: '90%', fontStyle: 'italic', marginTop: '2px', fontWeight: 'bold' }}>
+                                      Megjegyzés: Csengő a kapun balra...
+                                    </div>
+                                  )}
+                                </div>
+                              ) : null;
 
-                            <div style={{ borderTop: '1px dashed #000000', margin: '8px 0' }}></div>
+                              const previewItems = (
+                                <>
+                                  {/* Table Header */}
+                                  <div style={{ display: 'flex', fontWeight: 'bold', borderBottom: '1px solid #000000', paddingBottom: '3px', marginBottom: '4px' }}>
+                                    <span style={{ flex: 1 }}>Tétel</span>
+                                    <span style={{ width: '40px', textAlign: 'center' }}>Db</span>
+                                    {showPrices && <span style={{ width: '80px', textAlign: 'right' }}>Érték</span>}
+                                  </div>
 
-                            {/* Table Header */}
-                            <div style={{ display: 'flex', fontWeight: 'bold', borderBottom: '1px solid #000000', paddingBottom: '3px', marginBottom: '4px' }}>
-                              <span style={{ flex: 1 }}>Tétel</span>
-                              <span style={{ width: '40px', textAlign: 'center' }}>Db</span>
-                              <span style={{ width: '80px', textAlign: 'right' }}>Érték</span>
-                            </div>
-
-                            {/* Table Items */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                              {previewOrder.items.map((item: any, idx: number) => {
-                                const price = item.price_at_order;
-                                let subnotes: string[] = [];
-                                if (item.custom_modifications) {
-                                  const mods = item.custom_modifications;
-                                  if (mods.portion === 'half') {
-                                    subnotes.push('⚠️ FÉL ADAG');
-                                  }
-                                  if (mods.ingredient_adjustments) {
-                                    Object.entries(mods.ingredient_adjustments).forEach(([ingIdStr, status]) => {
-                                      const ingId = parseInt(ingIdStr);
-                                      const ingredient = db.inventory.find((i: any) => i.id === ingId);
-                                      if (ingredient) {
-                                        if (status === 'none') {
-                                          subnotes.push(`❌ NÉLKÜL: ${ingredient.name.toUpperCase()}`);
-                                        } else if (status === 'double') {
-                                          subnotes.push(`➕ DUPLA: ${ingredient.name.toUpperCase()}`);
+                                  {/* Table Items */}
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {previewOrder.items.map((item: any, idx: number) => {
+                                      const price = item.price_at_order;
+                                      let subnotes: string[] = [];
+                                      if (item.custom_modifications) {
+                                        const mods = item.custom_modifications;
+                                        if (mods.portion === 'half') {
+                                          subnotes.push('⚠️ FÉL ADAG');
+                                        }
+                                        if (mods.ingredient_adjustments) {
+                                          Object.entries(mods.ingredient_adjustments).forEach(([ingIdStr, status]) => {
+                                            const ingId = parseInt(ingIdStr);
+                                            const ingredient = db.inventory.find((i: any) => i.id === ingId);
+                                            if (ingredient) {
+                                              if (status === 'none') {
+                                                subnotes.push(`❌ NÉLKÜL: ${ingredient.name.toUpperCase()}`);
+                                              } else if (status === 'double') {
+                                                subnotes.push(`➕ DUPLA: ${ingredient.name.toUpperCase()}`);
+                                              }
+                                            }
+                                          });
+                                        }
+                                        if (mods.note && mods.note.trim()) {
+                                          subnotes.push(`💬 MEGJEGYZÉS: ${mods.note.trim().toUpperCase()}`);
                                         }
                                       }
-                                    });
-                                  }
-                                  if (mods.note && mods.note.trim()) {
-                                    subnotes.push(`💬 MEGJEGYZÉS: ${mods.note.trim().toUpperCase()}`);
-                                  }
-                                }
 
-                                return (
-                                  <div key={idx} style={{ display: 'flex', flexDirection: 'column' }}>
-                                    <div style={{ display: 'flex' }}>
-                                      <span style={{ flex: 1, fontWeight: 'bold' }}>{item.name}</span>
-                                      <span style={{ width: '40px', textAlign: 'center' }}>{item.quantity}</span>
-                                      <span style={{ width: '80px', textAlign: 'right' }}>{(price * item.quantity).toLocaleString()} Ft</span>
+                                      return (
+                                        <div key={idx} style={{ display: 'flex', flexDirection: 'column' }}>
+                                          <div style={{ display: 'flex' }}>
+                                            <span style={{ flex: 1, fontWeight: 'bold', fontSize: layout === 'kitchen' ? '110%' : '100%' }}>{item.name}</span>
+                                            <span style={{ width: '40px', textAlign: 'center', fontWeight: 'bold', fontSize: layout === 'kitchen' ? '110%' : '100%' }}>{item.quantity}</span>
+                                            {showPrices && <span style={{ width: '80px', textAlign: 'right' }}>{(price * item.quantity).toLocaleString()} Ft</span>}
+                                          </div>
+                                          {subnotes.length > 0 && (
+                                            <div style={{ fontSize: '85%', paddingLeft: '6px', marginTop: '2px', borderLeft: '2px solid #000', fontWeight: 'bold', lineHeight: '1.2' }}>
+                                              {subnotes.map((n, i) => (
+                                                <div key={i}>{n}</div>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </>
+                              );
+
+                              const previewTotals = showPrices ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>Részösszeg:</span>
+                                    <span>6 470 Ft</span>
+                                  </div>
+                                  {config.showPackagingFee && (
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                      <span>Csomagolási díj:</span>
+                                      <span>550 Ft</span>
                                     </div>
-                                    {subnotes.length > 0 && (
-                                      <div style={{ fontSize: '85%', paddingLeft: '6px', marginTop: '2px', borderLeft: '2px solid #000', fontWeight: 'bold', lineHeight: '1.2' }}>
-                                        {subnotes.map((n, i) => (
-                                          <div key={i}>{n}</div>
-                                        ))}
-                                      </div>
-                                    )}
+                                  )}
+                                  {config.showDeliveryFee && (
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                      <span>Szállítási díj:</span>
+                                      <span>500 Ft</span>
+                                    </div>
+                                  )}
+                                  {config.showDiscount && (
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                      <span>Kedvezmény (10%):</span>
+                                      <span>-702 Ft</span>
+                                    </div>
+                                  )}
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '110%', marginTop: '6px' }}>
+                                    <span>ÖSSZESEN:</span>
+                                    <span>6 818 Ft</span>
                                   </div>
+                                </div>
+                              ) : null;
+
+                              const previewFooter = config.footerText && layout !== 'kitchen' ? (
+                                <div style={{ textAlign: 'center', fontWeight: 'bold', whiteSpace: 'pre-wrap', marginTop: '6px' }}>
+                                  {config.footerText}
+                                </div>
+                              ) : null;
+
+                              if (layout === 'delivery') {
+                                return (
+                                  <>
+                                    {previewCustomer}
+                                    <div style={{ borderTop: '1px dashed #000000', margin: '8px 0' }}></div>
+                                    {config.logoPosition === 'top' && previewLogo}
+                                    {previewHeader}
+                                    {config.logoPosition === 'before_items' && previewLogo}
+                                    {previewMetadata}
+                                    <div style={{ borderTop: '1px dashed #000000', margin: '8px 0' }}></div>
+                                    {previewItems}
+                                    <div style={{ borderTop: '1px dashed #000000', margin: '8px 0' }}></div>
+                                    {previewTotals}
+                                    <div style={{ borderTop: '2px double #000000', margin: '8px 0' }}></div>
+                                    {config.logoPosition === 'bottom' && previewLogo}
+                                    {previewFooter}
+                                  </>
                                 );
-                              })}
-                            </div>
-
-                            <div style={{ borderTop: '1px dashed #000000', margin: '8px 0' }}></div>
-
-                            {/* Totals */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span>Részösszeg:</span>
-                                <span>6 470 Ft</span>
-                              </div>
-                              {config.showPackagingFee && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                  <span>Csomagolási díj:</span>
-                                  <span>550 Ft</span>
-                                </div>
-                              )}
-                              {config.showDeliveryFee && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                  <span>Szállítási díj:</span>
-                                  <span>500 Ft</span>
-                                </div>
-                              )}
-                              {config.showDiscount && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                  <span>Kedvezmény (10%):</span>
-                                  <span>-702 Ft</span>
-                                </div>
-                              )}
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '110%', marginTop: '6px' }}>
-                                <span>ÖSSZESEN:</span>
-                                <span>6 818 Ft</span>
-                              </div>
-                            </div>
-
-                            {/* Customer Details */}
-                            {config.showCustomerDetails && (
-                              <>
-                                <div style={{ borderTop: '1px dashed #000000', margin: '8px 0' }}></div>
-                                <div><strong>Kiszállítási Cím:</strong></div>
-                                <div>Vevő: Kovács János</div>
-                                <div style={{ fontWeight: 'bold', fontSize: '105%' }}>8900 Zalaegerszeg, Kossuth Lajos utca 12.</div>
-                                {config.showComment && (
-                                  <div style={{ fontSize: '90%', fontStyle: 'italic', marginTop: '2px' }}>
-                                    Megjegyzés: Csengő a kapun balra, kérem hívjon érkezéskor.
-                                  </div>
-                                )}
-                              </>
-                            )}
-
-                            <div style={{ borderTop: '2px double #000000', margin: '8px 0' }}></div>
-
-                            {/* Logo Bottom */}
-                            {config.logoPosition === 'bottom' && config.logoBase64 && (
-                              <div style={{ textAlign: config.logoAlignment as any, padding: '10px 0 4px 0' }}>
-                                <img src={config.logoBase64} style={{ maxWidth: `${config.logoScale}%`, height: 'auto' }} />
-                              </div>
-                            )}
-
-                            {/* Footer */}
-                            {config.footerText && (
-                              <div style={{ textAlign: 'center', fontWeight: 'bold', whiteSpace: 'pre-wrap', marginTop: '6px' }}>
-                                {config.footerText}
-                              </div>
-                            )}
+                              } else if (layout === 'kitchen') {
+                                return (
+                                  <>
+                                    <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '120%', border: '2px solid #000', padding: '4px', marginBottom: '8px' }}>⚠️ KONYHAI BLOKK ⚠️</div>
+                                    {previewMetadata}
+                                    {previewCustomer}
+                                    <div style={{ borderTop: '1px dashed #000000', margin: '8px 0' }}></div>
+                                    {previewItems}
+                                    <div style={{ borderTop: '2px double #000000', margin: '8px 0' }}></div>
+                                  </>
+                                );
+                              } else {
+                                // classic / minimal
+                                return (
+                                  <>
+                                    {config.logoPosition === 'top' && previewLogo}
+                                    {previewHeader}
+                                    {config.logoPosition === 'before_items' && previewLogo}
+                                    <div style={{ borderTop: '1px dashed #000000', margin: '8px 0' }}></div>
+                                    {previewMetadata}
+                                    <div style={{ borderTop: '1px dashed #000000', margin: '8px 0' }}></div>
+                                    {previewItems}
+                                    <div style={{ borderTop: '1px dashed #000000', margin: '8px 0' }}></div>
+                                    {previewTotals}
+                                    {previewCustomer}
+                                    <div style={{ borderTop: '2px double #000000', margin: '8px 0' }}></div>
+                                    {config.logoPosition === 'bottom' && previewLogo}
+                                    {previewFooter}
+                                  </>
+                                );
+                              }
+                            })()}
 
                             {/* Zigzag bottom styling wrapper */}
                             <style>{`
