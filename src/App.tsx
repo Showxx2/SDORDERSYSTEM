@@ -886,21 +886,27 @@ export default function App() {
 
   const [availablePrinters, setAvailablePrinters] = useState<string[]>([]);
 
-  useEffect(() => {
+  const refreshPrinters = () => {
     if (window.electronAPI?.getPrinters) {
       window.electronAPI.getPrinters().then((printers: any[]) => {
         if (printers && printers.length > 0) {
           setAvailablePrinters(printers.map((p: any) => p.name));
         } else {
-          setAvailablePrinters(['Epson TM-T20II', 'Microsoft Print to PDF']);
+          setAvailablePrinters([]);
         }
       }).catch((err: any) => {
         console.error("Error loading printers:", err);
-        setAvailablePrinters(['Epson TM-T20II', 'Rendszer alapértelmezett']);
+        setAvailablePrinters([]);
       });
     } else {
       setAvailablePrinters(['Epson TM-T20II', 'Star TSP100', 'Microsoft Print to PDF', 'HP LaserJet 400']);
     }
+  };
+
+  useEffect(() => {
+    refreshPrinters();
+    const t = setTimeout(refreshPrinters, 1500);
+    return () => clearTimeout(t);
   }, []);
 
   // Login Form States
@@ -8237,6 +8243,27 @@ export default function App() {
                                 <option key={p} value={p} style={{ background: '#1c1c1e' }}>{p}</option>
                               ))}
                             </select>
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+                              <span style={{ fontSize: '11px', color: availablePrinters.length > 0 ? '#30d158' : '#ff453a', fontWeight: 600 }}>
+                                {availablePrinters.length > 0 
+                                  ? `✓ Rendszerben észlelt eszközök (${availablePrinters.length} db):` 
+                                  : '⚠️ Egyetlen fizikai nyomtatót sem észlelt a rendszer!'}
+                              </span>
+                              <button 
+                                className="btn" 
+                                onClick={refreshPrinters} 
+                                style={{ padding: '2px 8px', fontSize: '10px', height: '22px', background: 'rgba(255,255,255,0.06)', color: 'white', border: '1px solid rgba(255,255,255,0.1)' }}
+                              >
+                                Lista frissítése
+                              </button>
+                            </div>
+
+                            {availablePrinters.length > 0 && (
+                              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px', background: 'rgba(0,0,0,0.15)', padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.02)', wordBreak: 'break-all' }}>
+                                {availablePrinters.join(', ')}
+                              </div>
+                            )}
                           </div>
                         </div>
 
