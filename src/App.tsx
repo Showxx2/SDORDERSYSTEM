@@ -1008,16 +1008,21 @@ export default function App() {
   // Admin Editing States
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [newItemName, setNewItemName] = useState('');
-  const [newItemPrice, setNewItemPrice] = useState(0);
-  const [newItemPackFee, setNewItemPackFee] = useState(0);
+  const [newItemPrice, setNewItemPrice] = useState<number | ''>('');
+  const [newItemPackFee, setNewItemPackFee] = useState<number | ''>('');
   const [newItemPackType, setNewItemPackType] = useState<string>('none');
   const [newItemCatId, setNewItemCatId] = useState(1);
   const [newItemDescription, setNewItemDescription] = useState('');
   const [newItemIngredients, setNewItemIngredients] = useState<{ ingredientId: number; quantity: number }[]>([]);
 
+  // Tracking last added new item properties for defaults
+  const [lastAddedCatId, setLastAddedCatId] = useState<number>(1);
+  const [lastAddedPackType, setLastAddedPackType] = useState<string>('none');
+  const [lastAddedPackFee, setLastAddedPackFee] = useState<number>(0);
+
   // States for adding a single ingredient inside the form
   const [selectedAddIngredientId, setSelectedAddIngredientId] = useState<number | null>(null);
-  const [selectedAddIngredientQty, setSelectedAddIngredientQty] = useState<number>(0);
+  const [selectedAddIngredientQty, setSelectedAddIngredientQty] = useState<number | ''>('');
 
   // New Detailed Inventory/Warehouse States
   const [inventorySubTab, setInventorySubTab] = useState<'items' | 'categories' | 'suppliers'>('items');
@@ -1028,14 +1033,14 @@ export default function App() {
   // Form bindings for Inventory Item modal
   const [invItemName, setInvItemName] = useState('');
   const [invItemCategoryId, setInvItemCategoryId] = useState<number | 'none'>('none');
-  const [invItemQuantity, setInvItemQuantity] = useState(0);
+  const [invItemQuantity, setInvItemQuantity] = useState<number | ''>('');
   const [invItemUnit, setInvItemUnit] = useState('kg');
-  const [invItemWarningLimit, setInvItemWarningLimit] = useState(0);
+  const [invItemWarningLimit, setInvItemWarningLimit] = useState<number | ''>('');
   const [invItemSupplierId, setInvItemSupplierId] = useState('');
-  const [invItemFreqValue, setInvItemFreqValue] = useState<number>(7);
+  const [invItemFreqValue, setInvItemFreqValue] = useState<number | ''>(7);
   const [invItemFreqUnit, setInvItemFreqUnit] = useState<'day' | 'week'>('day');
   const [invItemProcurement, setInvItemProcurement] = useState(false);
-  const [invItemDoubleExtraPrice, setInvItemDoubleExtraPrice] = useState<number>(0);
+  const [invItemDoubleExtraPrice, setInvItemDoubleExtraPrice] = useState<number | ''>(0);
 
   // Form bindings for Inventory Category modal
   const [invCatName, setInvCatName] = useState('');
@@ -1245,7 +1250,7 @@ export default function App() {
   // Packaging Edit States
   const [editingPackKey, setEditingPackKey] = useState<string | null>(null);
   const [newPackName, setNewPackName] = useState('');
-  const [newPackPrice, setNewPackPrice] = useState(0);
+  const [newPackPrice, setNewPackPrice] = useState<number | ''>('');
 
   // Category Edit States
   const [menuSubTab, setMenuSubTab] = useState<'items' | 'categories'>('items');
@@ -1269,7 +1274,7 @@ export default function App() {
   const [promoRecurringWeeksInterval, setPromoRecurringWeeksInterval] = useState(1);
   const [promoRecurringStartDate, setPromoRecurringStartDate] = useState('');
   const [promoPriceAdjustmentType, setPromoPriceAdjustmentType] = useState<'percent' | 'fixed'>('percent');
-  const [promoPriceAdjustmentValue, setPromoPriceAdjustmentValue] = useState(0);
+  const [promoPriceAdjustmentValue, setPromoPriceAdjustmentValue] = useState<number | ''>('');
   const [promoPackagingFeePolicy, setPromoPackagingFeePolicy] = useState<'standard' | 'free' | 'discounted'>('standard');
   const [openPromoTypeDropdown, setOpenPromoTypeDropdown] = useState(false);
   const [openPromoPriceDropdown, setOpenPromoPriceDropdown] = useState(false);
@@ -5473,13 +5478,13 @@ export default function App() {
                               pointerEvents: menuSubTab === 'items' ? 'auto' : 'none'
                             }}
                             onClick={() => {
-                              setEditingItem({ id: 0, category_id: 1, name: '', price: 1000, packaging_fee: 150 });
+                              setEditingItem({ id: 0, category_id: lastAddedCatId, name: '', price: 0, packaging_fee: lastAddedPackFee });
                               setEditingItemTab('general');
                               setNewItemName('');
-                              setNewItemPrice(1000);
-                              setNewItemPackFee(150);
-                              setNewItemPackType('pizza');
-                              setNewItemCatId(1);
+                              setNewItemPrice('');
+                              setNewItemPackFee(lastAddedPackFee);
+                              setNewItemPackType(lastAddedPackType);
+                              setNewItemCatId(lastAddedCatId);
                               setNewItemDescription('');
                               setNewItemIngredients([]);
                               if (db.inventory.length > 0) {
@@ -5687,7 +5692,7 @@ export default function App() {
                                     className="input-field" 
                                     style={{ height: '42px', fontSize: '14px', padding: '0 12px', borderRadius: '8px' }}
                                     value={newItemPrice} 
-                                    onChange={e => setNewItemPrice(parseInt(e.target.value) || 0)} 
+                                    onChange={e => setNewItemPrice(e.target.value === '' ? '' : parseInt(e.target.value) || 0)} 
                                   />
                                 </div>
 
@@ -5933,7 +5938,7 @@ export default function App() {
                                               className="input-field"
                                               style={{ height: '42px', fontSize: '14px', padding: '0 12px', borderRadius: '8px' }}
                                               value={promoPriceAdjustmentValue}
-                                              onChange={e => setPromoPriceAdjustmentValue(parseInt(e.target.value) || 0)}
+                                              onChange={e => setPromoPriceAdjustmentValue(e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
                                               placeholder={promoPriceAdjustmentType === 'percent' ? 'pl: -10' : 'pl: 1500'}
                                             />
                                           </div>
@@ -6085,7 +6090,7 @@ export default function App() {
                                     className="input-field"
                                     style={{ height: '42px', fontSize: '14px', padding: '0 12px', borderRadius: '8px' }}
                                     value={selectedAddIngredientQty}
-                                    onChange={e => setSelectedAddIngredientQty(parseFloat(e.target.value) || 0)}
+                                    onChange={e => setSelectedAddIngredientQty(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
                                     step="any"
                                   />
                                 </div>
@@ -6095,10 +6100,11 @@ export default function App() {
                                   className="btn btn-primary"
                                   style={{ height: '44px', padding: '0 20px', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', borderRadius: '8px', width: '100%', fontWeight: 600 }}
                                   onClick={() => {
-                                    if (!selectedAddIngredientId || selectedAddIngredientQty <= 0) return;
+                                    const qty = Number(selectedAddIngredientQty) || 0;
+                                    if (!selectedAddIngredientId || qty <= 0) return;
                                     setNewItemIngredients([
                                       ...newItemIngredients,
-                                      { ingredientId: selectedAddIngredientId, quantity: selectedAddIngredientQty }
+                                      { ingredientId: selectedAddIngredientId, quantity: qty }
                                     ]);
                                     // Reset select to next available in inventory
                                     const remaining = db.inventory.filter((inv: any) => 
@@ -6110,7 +6116,7 @@ export default function App() {
                                     } else {
                                       setSelectedAddIngredientId(null);
                                     }
-                                    setSelectedAddIngredientQty(1);
+                                    setSelectedAddIngredientQty('');
                                   }}
                                   disabled={!selectedAddIngredientId}
                                 >
@@ -6169,20 +6175,24 @@ export default function App() {
                                   id: newId,
                                   category_id: newItemCatId,
                                   name: newItemName,
-                                  price: newItemPrice,
-                                  packaging_fee: newItemPackFee,
+                                  price: Number(newItemPrice) || 0,
+                                  packaging_fee: Number(newItemPackFee) || 0,
                                   packaging_type: newItemPackType,
                                   description: newItemDescription,
                                   ingredients: newItemIngredients,
                                   allergens: finalAllergens,
                                   promotion: promoObj
                                 });
+                                // Save last added item defaults
+                                setLastAddedCatId(newItemCatId);
+                                setLastAddedPackType(newItemPackType);
+                                setLastAddedPackFee(Number(newItemPackFee) || 0);
                               } else {
                                 updatedItems = db.items.map((i: any) => i.id === editingItem.id ? {
                                   ...i,
                                   name: newItemName,
-                                  price: newItemPrice,
-                                  packaging_fee: newItemPackFee,
+                                  price: Number(newItemPrice) || 0,
+                                  packaging_fee: Number(newItemPackFee) || 0,
                                   packaging_type: newItemPackType,
                                   description: newItemDescription,
                                   ingredients: newItemIngredients,
@@ -6599,7 +6609,7 @@ export default function App() {
                                           className="input-field"
                                           style={{ height: '42px', fontSize: '14px', padding: '0 12px', borderRadius: '8px' }}
                                           value={promoPriceAdjustmentValue}
-                                          onChange={e => setPromoPriceAdjustmentValue(parseInt(e.target.value) || 0)}
+                                          onChange={e => setPromoPriceAdjustmentValue(e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
                                           placeholder="pl: -10"
                                         />
                                       </div>
@@ -6988,7 +6998,7 @@ export default function App() {
                                 recurringWeeksInterval: promoType === 'recurring' ? promoRecurringWeeksInterval : undefined,
                                 recurringStartDate: promoType === 'recurring' && promoRecurringWeeksInterval > 1 ? promoRecurringStartDate : undefined,
                                 priceAdjustmentType: 'percent' as const,
-                                priceAdjustmentValue: promoPriceAdjustmentValue,
+                                priceAdjustmentValue: Number(promoPriceAdjustmentValue) || 0,
                                 packagingFeePolicy: promoPackagingFeePolicy
                               };
 
@@ -7524,7 +7534,7 @@ export default function App() {
                               type="number" 
                               className="input-field" 
                               value={newPackPrice}
-                              onChange={e => setNewPackPrice(parseInt(e.target.value) || 0)}
+                              onChange={e => setNewPackPrice(e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
                             />
                           </div>
 
@@ -7536,18 +7546,19 @@ export default function App() {
                                 const nameTrimmed = newPackName.trim().toLowerCase();
                                 if (!nameTrimmed) return;
 
+                                const finalPrice = Number(newPackPrice) || 0;
                                 const updatedFees = { ...db.packagingFees };
                                 if (editingPackKey === '') {
                                   // Add new key
-                                  updatedFees[nameTrimmed] = newPackPrice;
+                                  updatedFees[nameTrimmed] = finalPrice;
                                 } else {
                                   // Update price
-                                  updatedFees[editingPackKey] = newPackPrice;
+                                  updatedFees[editingPackKey] = finalPrice;
                                   
                                   // Also update any menu items using this packaging type to sync their packaging_fee
                                   const updatedItems = db.items.map((item: any) => {
                                     if (item.packaging_type === editingPackKey) {
-                                      return { ...item, packaging_fee: newPackPrice };
+                                      return { ...item, packaging_fee: finalPrice };
                                     }
                                     return item;
                                   });
@@ -8153,7 +8164,7 @@ export default function App() {
                                   type="number" 
                                   className="input-field" 
                                   value={invItemQuantity} 
-                                  onChange={e => setInvItemQuantity(parseFloat(e.target.value) || 0)} 
+                                  onChange={e => setInvItemQuantity(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} 
                                 />
                               </div>
                               <div>
@@ -8172,7 +8183,7 @@ export default function App() {
                                   type="number" 
                                   className="input-field" 
                                   value={invItemWarningLimit} 
-                                  onChange={e => setInvItemWarningLimit(parseFloat(e.target.value) || 0)} 
+                                  onChange={e => setInvItemWarningLimit(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} 
                                 />
                               </div>
                             </div>
@@ -8183,7 +8194,7 @@ export default function App() {
                                 type="number" 
                                 className="input-field" 
                                 value={invItemDoubleExtraPrice} 
-                                onChange={e => setInvItemDoubleExtraPrice(parseFloat(e.target.value) || 0)} 
+                                onChange={e => setInvItemDoubleExtraPrice(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)} 
                                 placeholder="Pl: 200"
                               />
                             </div>
@@ -8198,7 +8209,7 @@ export default function App() {
                                     className="input-field" 
                                     style={{ width: '70px' }}
                                     value={invItemFreqValue} 
-                                    onChange={e => setInvItemFreqValue(parseInt(e.target.value) || 1)} 
+                                    onChange={e => setInvItemFreqValue(e.target.value === '' ? '' : parseInt(e.target.value) || 1)} 
                                   />
                                   <AppleSelect
                                     value={invItemFreqUnit}
@@ -8262,7 +8273,7 @@ export default function App() {
                                   }
 
                                   const categoryId = invItemCategoryId === 'none' ? null : invItemCategoryId;
-                                  const frequencyStr = `${invItemFreqValue} ${invItemFreqUnit === 'week' ? 'hetente' : 'naponta'}`;
+                                  const frequencyStr = `${Number(invItemFreqValue) || 1} ${invItemFreqUnit === 'week' ? 'hetente' : 'naponta'}`;
 
                                   let updated;
                                   if (editingInvItem.id === 'NEW') {
@@ -8272,22 +8283,22 @@ export default function App() {
                                       id: newId,
                                       name: invItemName.trim(),
                                       category_id: categoryId,
-                                      quantity: invItemQuantity,
+                                      quantity: Number(invItemQuantity) || 0,
                                       unit: invItemUnit.trim() || 'kg',
-                                      warning_limit: invItemWarningLimit,
+                                      warning_limit: Number(invItemWarningLimit) || 0,
                                       supplier_id: invItemSupplierId,
                                       purchase_frequency: frequencyStr,
                                       last_filled_at: new Date().toISOString(),
                                       last_filled_by: currentUser?.name || 'Rendszer',
                                       is_under_procurement: invItemProcurement,
-                                      double_extra_price: invItemDoubleExtraPrice,
+                                      double_extra_price: Number(invItemDoubleExtraPrice) || 0,
                                       is_active: true
                                     };
                                     updated = [...inventory, newItem];
                                   } else {
                                     // Update existing raktárcikk
                                     // Autodetect fill event: if new quantity is greater than previous, update fill logs
-                                    const isFilled = invItemQuantity > editingInvItem.quantity;
+                                    const isFilled = (Number(invItemQuantity) || 0) > editingInvItem.quantity;
                                     
                                     updated = inventory.map((i: any) => 
                                       i.id === editingInvItem.id 
@@ -8295,13 +8306,13 @@ export default function App() {
                                             ...i,
                                             name: invItemName.trim(),
                                             category_id: categoryId,
-                                            quantity: invItemQuantity,
+                                            quantity: Number(invItemQuantity) || 0,
                                             unit: invItemUnit.trim() || 'kg',
-                                            warning_limit: invItemWarningLimit,
+                                            warning_limit: Number(invItemWarningLimit) || 0,
                                             supplier_id: invItemSupplierId,
                                             purchase_frequency: frequencyStr,
                                             is_under_procurement: invItemProcurement,
-                                            double_extra_price: invItemDoubleExtraPrice,
+                                            double_extra_price: Number(invItemDoubleExtraPrice) || 0,
                                             last_filled_at: isFilled ? new Date().toISOString() : i.last_filled_at,
                                             last_filled_by: isFilled ? (currentUser?.name || 'Rendszer') : i.last_filled_by
                                           }
