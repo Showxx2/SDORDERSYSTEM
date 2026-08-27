@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Settings, User, Search, Send, X, Plus, Trash2, Lock, 
+  Settings, User, Search, Send, X, Plus, Trash2, Lock, Info, 
   History, Sparkles, TrendingUp, Layers, Package, Shield, 
   SendHorizontal, Truck, LogOut, 
   FileText, ChevronLeft, Percent, CreditCard, Wallet, 
@@ -1109,6 +1109,31 @@ export default function App() {
   const [openPromoTypeDropdown, setOpenPromoTypeDropdown] = useState(false);
   const [openPromoPriceDropdown, setOpenPromoPriceDropdown] = useState(false);
   const [openPromoPackDropdown, setOpenPromoPackDropdown] = useState(false);
+
+  const [editingItemTab, setEditingItemTab] = useState<'general' | 'promo' | 'ingredients'>('general');
+  const tabContentRef = useRef<HTMLDivElement>(null);
+  const [tabHeight, setTabHeight] = useState<number>(300);
+
+  useEffect(() => {
+    if (!editingItem || !tabContentRef.current) return;
+    const updateHeight = () => {
+      if (tabContentRef.current) {
+        setTabHeight(tabContentRef.current.scrollHeight);
+      }
+    };
+    
+    const resizeObserver = new ResizeObserver(() => {
+      updateHeight();
+    });
+    resizeObserver.observe(tabContentRef.current);
+    
+    const timer = setTimeout(updateHeight, 80);
+    
+    return () => {
+      resizeObserver.disconnect();
+      clearTimeout(timer);
+    };
+  }, [editingItem, editingItemTab, promoIsEnabled, newItemIngredients]);
 
   useEffect(() => {
     const promo = editingItem ? editingItem.promotion : (editingCategory ? editingCategory.promotion : undefined);
@@ -5206,6 +5231,7 @@ export default function App() {
                             }}
                             onClick={() => {
                               setEditingItem({ id: 0, category_id: 1, name: '', price: 1000, packaging_fee: 150 });
+                              setEditingItemTab('general');
                               setNewItemName('');
                               setNewItemPrice(1000);
                               setNewItemPackFee(150);
@@ -5267,525 +5293,669 @@ export default function App() {
                   {/* Add / Edit Form Modal card overlay */}
                   {editingItem && (
                     <div className="modal-overlay" onClick={() => setEditingItem(null)}>
-                      <div className="modal-card" style={{ width: '600px', maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto', background: 'var(--panel-bg)', border: '1px solid var(--glass-border)', padding: '20px', display: 'block' }} onClick={e => e.stopPropagation()}>
-                        <div className="modal-header" style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                          <span className="modal-title" style={{ fontSize: '15px', fontWeight: 700 }}>
+                      <div className="modal-card" style={{
+                        maxWidth: '950px',
+                        width: '95%',
+                        height: `${tabHeight + (editingItemTab === 'general' ? 260 : 310)}px`,
+                        maxHeight: '95vh',
+                        background: 'var(--panel-bg)',
+                        border: '1px solid var(--glass-border)',
+                        padding: '24px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '20px',
+                        transition: 'height 0.35s cubic-bezier(0.25, 1, 0.5, 1)',
+                        overflow: 'hidden'
+                      }} onClick={e => e.stopPropagation()}>
+                        
+                        <div className="modal-header" style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span className="modal-title" style={{ fontSize: '18px', fontWeight: 700, color: 'white' }}>
                             {editingItem.id === 0 ? 'Új Étel felvétele' : 'Étel szerkesztése'}
                           </span>
-                          <button className="island-close-btn" style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }} onClick={() => setEditingItem(null)}>
-                            <X size={16} />
+                          <button className="island-close-btn" style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', transition: 'background-color 0.2s' }} onClick={() => setEditingItem(null)}>
+                            <X size={18} />
                           </button>
                         </div>
-                        
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                          
-                          {/* Name */}
-                          <div>
-                            <label className="input-label">Név</label>
-                            <input 
-                              type="text" 
-                              className="input-field" 
-                              value={newItemName} 
-                              onChange={e => setNewItemName(e.target.value)} 
-                              placeholder="pl: Pizza Prosciutto"
-                            />
-                          </div>
 
-                          {/* Price & Packaging Type */}
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '12px' }}>
-                            <div>
-                              <label className="input-label">Ár (FT)</label>
-                              <input 
-                                type="number" 
-                                className="input-field" 
-                                value={newItemPrice} 
-                                onChange={e => setNewItemPrice(parseInt(e.target.value) || 0)} 
-                              />
-                            </div>
-                            <div>
-                              <label className="input-label">Csomagolás típusa</label>
-                              <AppleSelect
-                                value={newItemPackType}
-                                onChange={val => {
-                                  const type = String(val);
-                                  setNewItemPackType(type);
-                                  if (type === 'none') {
-                                    setNewItemPackFee(0);
-                                  } else {
-                                    setNewItemPackFee(db.packagingFees[type] || 0);
-                                  }
-                                }}
-                                options={[
-                                  { value: 'none', label: 'Nincs csomagolás (0 FT)' },
-                                  ...Object.keys(db.packagingFees).map(key => ({
-                                    value: key,
-                                    label: `${key === 'pizza' ? 'Pizza doboz' : key === 'box' ? 'Elviteles doboz' : key === 'cup' ? 'Pohár' : key} (${db.packagingFees[key]} FT)`
-                                  }))
-                                ]}
-                                icon={<Package size={12} />}
-                                isOpen={openItemPackDropdown}
-                                onToggle={() => setOpenItemPackDropdown(!openItemPackDropdown)}
-                                onClose={() => setOpenItemPackDropdown(false)}
-                              />
-                            </div>
-                          </div>
-
-                          {/* Category & Description */}
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
-                            <div>
-                              <label className="input-label">Kategória</label>
-                              <AppleSelect
-                                value={newItemCatId}
-                                onChange={val => setNewItemCatId(Number(val))}
-                                options={db.categories.map((c: any) => ({
-                                  value: c.id,
-                                  label: c.name
-                                }))}
-                                icon={<Layers size={12} />}
-                                isOpen={openItemCatDropdown}
-                                onToggle={() => setOpenItemCatDropdown(!openItemCatDropdown)}
-                                onClose={() => setOpenItemCatDropdown(false)}
-                              />
-                            </div>
-                            <div>
-                              <label className="input-label">Leírás</label>
-                              <input 
-                                type="text" 
-                                className="input-field" 
-                                value={newItemDescription} 
-                                onChange={e => setNewItemDescription(e.target.value)} 
-                                placeholder="pl: paradicsomszósz, sonka, gomba..."
-                              />
-                            </div>
-                          </div>
-
-                          {/* Ingredients / Recipe Editor */}
-                          <div style={{ border: '1px solid var(--glass-border)', borderRadius: 'var(--radius-md)', padding: '12px', background: 'rgba(0,0,0,0.15)' }}>
-                            <label className="input-label" style={{ fontWeight: 600, color: 'var(--primary)', marginBottom: '8px', fontSize: '13px' }}>
-                              Alapanyagok & Receptek (Allergén auto-detektálás)
-                            </label>
-
-                            {/* List of current ingredients in recipe */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '140px', overflowY: 'auto', marginBottom: '10px' }}>
-                              {newItemIngredients.map((ing) => {
-                                const invItem = db.inventory.find((i: any) => i.id === ing.ingredientId);
-                                if (!invItem) return null;
-                                const allergens = detectAllergens(invItem.name);
-
-                                return (
-                                  <div key={ing.ingredientId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)', padding: '6px 10px', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(255,255,255,0.04)' }}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                      <span style={{ fontSize: '13px', fontWeight: 500, color: 'white' }}>
-                                        {invItem.name} ({ing.quantity} {invItem.unit})
-                                      </span>
-                                      {/* Auto Allergen badges */}
-                                      {allergens.length > 0 && (
-                                        <div style={{ display: 'flex', gap: '4px', marginTop: '2px' }}>
-                                          {allergens.map(a => (
-                                            <span 
-                                              key={a.code} 
-                                              style={{ background: 'rgba(255,159,10,0.15)', border: '1px solid rgba(255,159,10,0.3)', color: '#ff9f0a', fontSize: '10px', padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}
-                                              title={`EU Allergén: ${a.name}`}
-                                            >
-                                              ⚠️ {a.name}
-                                            </span>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </div>
-                                    <button 
-                                      className="btn btn-danger" 
-                                      style={{ padding: '2px 6px', fontSize: '11px', height: '24px' }}
-                                      onClick={() => {
-                                        setNewItemIngredients(newItemIngredients.filter(i => i.ingredientId !== ing.ingredientId));
-                                      }}
-                                    >
-                                      <Trash2 size={12} />
-                                    </button>
-                                  </div>
-                                );
-                              })}
-                              {newItemIngredients.length === 0 && (
-                                <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', padding: '6px' }}>
-                                  Nincs még alapanyag hozzáadva ehhez az ételhez.
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Add ingredient controls */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr 1fr', gap: '10px', alignItems: 'flex-end', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '10px' }}>
-                              <div>
-                                <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Alapanyag választás</label>
-                                <AppleSelect
-                                  value={selectedAddIngredientId || ''}
-                                  onChange={val => setSelectedAddIngredientId(Number(val) || null)}
-                                  options={db.inventory
-                                    .filter((inv: any) => !newItemIngredients.some(ing => ing.ingredientId === inv.id))
-                                    .map((inv: any) => ({
-                                      value: inv.id,
-                                      label: inv.name
-                                    }))
-                                  }
-                                  icon={<Package size={12} />}
-                                  isOpen={openItemIngredDropdown}
-                                  onToggle={() => setOpenItemIngredDropdown(!openItemIngredDropdown)}
-                                  onClose={() => setOpenItemIngredDropdown(false)}
-                                  openUpward={true}
-                                />
-                              </div>
-                              <div>
-                                <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>
-                                  Mennyiség ({db.inventory.find((i: any) => i.id === selectedAddIngredientId)?.unit || ''})
-                                </label>
-                                <input
-                                  type="number"
-                                  className="input-field"
-                                  style={{ height: '32px', fontSize: '12px' }}
-                                  value={selectedAddIngredientQty}
-                                  onChange={e => setSelectedAddIngredientQty(parseFloat(e.target.value) || 0)}
-                                  step="any"
-                                />
-                              </div>
-                              <button
-                                className="btn btn-primary"
-                                style={{ height: '32px', padding: '0 8px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
-                                onClick={() => {
-                                  if (!selectedAddIngredientId || selectedAddIngredientQty <= 0) return;
-                                  setNewItemIngredients([
-                                    ...newItemIngredients,
-                                    { ingredientId: selectedAddIngredientId, quantity: selectedAddIngredientQty }
-                                  ]);
-                                  // Reset select to next available in inventory
-                                  const remaining = db.inventory.filter((inv: any) => 
-                                    inv.id !== selectedAddIngredientId && 
-                                    !newItemIngredients.some(ing => ing.ingredientId === inv.id)
-                                  );
-                                  if (remaining.length > 0) {
-                                    setSelectedAddIngredientId(remaining[0].id);
-                                  } else {
-                                    setSelectedAddIngredientId(null);
-                                  }
-                                  setSelectedAddIngredientQty(1);
-                                }}
-                                disabled={!selectedAddIngredientId}
-                              >
-                                <Plus size={14} /> Hozzáad
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* TIMED PROMOTION CONFIGURATION CARD */}
-                          {(() => {
-                            const itemCategory = db.categories.find((c: any) => c.id === newItemCatId);
-                            const hasCategoryPromotion = !!(itemCategory && itemCategory.promotion?.isEnabled);
-                            const categoryName = itemCategory ? itemCategory.name : '';
+                        {/* Tab Selector Navbar */}
+                        <div style={{
+                          display: 'flex',
+                          background: 'rgba(255, 255, 255, 0.04)',
+                          borderRadius: '10px',
+                          padding: '4px',
+                          border: '1px solid rgba(255,255,255,0.06)'
+                        }}>
+                          {[
+                            { id: 'general', label: 'Általános', icon: <Info size={14} /> },
+                            { id: 'promo', label: 'Időzítés', icon: <Clock size={14} /> },
+                            { id: 'ingredients', label: 'Alapanyagok', icon: <Package size={14} /> }
+                          ].map(tab => {
+                            const isActive = editingItemTab === tab.id;
                             return (
-                              <div ref={promoPanelRef} style={{
-                                border: '1px solid rgba(255,255,255,0.08)',
-                                borderRadius: '10px',
-                                padding: '14px',
-                                background: 'rgba(255,255,255,0.02)',
-                                marginTop: '8px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '12px'
-                              }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)' }}>
-                                    Időzített Árazás & Akciók
-                                  </span>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', userSelect: 'none' }}>
-                                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                                      {promoIsEnabled ? 'Aktív' : 'Deaktív'}
-                                    </span>
-                                    <div 
-                                      onClick={() => {
-                                        const nextVal = !promoIsEnabled;
-                                        setPromoIsEnabled(nextVal);
-                                        if (nextVal) {
-                                          setTimeout(() => {
-                                            promoPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                                          }, 80);
-                                        }
-                                      }}
-                                      style={{
-                                        width: '36px',
-                                        height: '20px',
-                                        borderRadius: '10px',
-                                        background: promoIsEnabled ? '#30d158' : '#ff453a',
-                                        position: 'relative',
-                                        cursor: 'pointer',
-                                        transition: 'background-color 0.2s ease',
-                                        boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)'
-                                      }}
-                                    >
-                                      <div 
-                                        style={{
-                                          width: '16px',
-                                          height: '16px',
-                                          borderRadius: '50%',
-                                          background: 'white',
-                                          position: 'absolute',
-                                          top: '2px',
-                                          left: promoIsEnabled ? '18px' : '2px',
-                                          transition: 'left 0.2s ease',
-                                          boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
-                                        }}
-                                      />
-                                    </div>
-                                  </div>
+                              <button
+                                key={tab.id}
+                                type="button"
+                                onClick={() => setEditingItemTab(tab.id as any)}
+                                style={{
+                                  flex: 1,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '8px',
+                                  padding: '10px 16px',
+                                  borderRadius: '8px',
+                                  border: 'none',
+                                  background: isActive ? '#0a84ff' : 'transparent',
+                                  color: 'white',
+                                  fontSize: '13px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s cubic-bezier(0.25, 1, 0.5, 1)',
+                                  boxShadow: isActive ? '0 2px 8px rgba(10,132,255,0.4)' : 'none'
+                                }}
+                              >
+                                {tab.icon}
+                                {tab.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Context Header (shown on non-General tabs) */}
+                        {editingItemTab !== 'general' && (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            background: 'rgba(10,132,255,0.08)',
+                            border: '1px solid rgba(10,132,255,0.15)',
+                            borderRadius: '8px',
+                            padding: '10px 16px',
+                            fontSize: '13px',
+                            color: 'white'
+                          }}>
+                            <span style={{ fontWeight: 600, color: '#0a84ff' }}>📍 Szerkesztett étel:</span>
+                            <span style={{ fontWeight: 700 }}>{newItemName || 'Névtelen étel'}</span>
+                            <span style={{ opacity: 0.4 }}>•</span>
+                            <span style={{ fontWeight: 600, color: '#0a84ff' }}>Kategória:</span>
+                            <span style={{ fontWeight: 700 }}>
+                              {db.categories.find((c: any) => c.id === newItemCatId)?.name || 'Ismeretlen'}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Modal Scrollable Body */}
+                        <div style={{
+                          flex: 1,
+                          minHeight: 0,
+                          overflowY: 'auto',
+                          paddingRight: '4px'
+                        }}>
+                          
+                          {/* TAB 1: GENERAL */}
+                          {editingItemTab === 'general' && (
+                            <div ref={tabContentRef} style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '10px 0' }}>
+                              <div>
+                                <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block' }}>Étel Neve</label>
+                                <input 
+                                  type="text" 
+                                  className="input-field" 
+                                  style={{ height: '46px', fontSize: '15px', padding: '0 16px', borderRadius: '8px' }}
+                                  value={newItemName} 
+                                  onChange={e => setNewItemName(e.target.value)} 
+                                  placeholder="pl: Pizza Prosciutto"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block' }}>Leírás / Összetevők röviden (étlapon megjelenő)</label>
+                                <input 
+                                  type="text" 
+                                  className="input-field" 
+                                  style={{ height: '46px', fontSize: '15px', padding: '0 16px', borderRadius: '8px' }}
+                                  value={newItemDescription} 
+                                  onChange={e => setNewItemDescription(e.target.value)} 
+                                  placeholder="pl: paradicsomszósz, sonka, gomba..."
+                                />
+                              </div>
+
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
+                                <div>
+                                  <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block' }}>Kategória</label>
+                                  <AppleSelect
+                                    value={newItemCatId}
+                                    onChange={val => setNewItemCatId(Number(val))}
+                                    options={db.categories.map((c: any) => ({
+                                      value: c.id,
+                                      label: c.name
+                                    }))}
+                                    icon={<Layers size={14} />}
+                                    isOpen={openItemCatDropdown}
+                                    onToggle={() => setOpenItemCatDropdown(!openItemCatDropdown)}
+                                    onClose={() => setOpenItemCatDropdown(false)}
+                                  />
                                 </div>
 
-                                {promoIsEnabled && (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px dashed rgba(255,255,255,0.06)', paddingTop: '10px' }}>
-                                    {hasCategoryPromotion && (
-                                      <div style={{
-                                        background: 'rgba(255, 159, 10, 0.12)',
-                                        border: '1px solid rgba(255, 159, 10, 0.25)',
-                                        borderRadius: '6px',
-                                        padding: '8px 10px',
-                                        color: '#ff9f0a',
-                                        fontSize: '11px',
-                                        fontWeight: 500
-                                      }}>
-                                        ⚠️ Figyelem: A(z) <strong>{categoryName}</strong> kategóriára már be van állítva egy aktív árazási szabály. Ha ide is beállítasz egy szabályt, az felülírja a kategória szintű beállítást (ez az étel prioritást élvez).
-                                      </div>
-                                    )}
+                                <div>
+                                  <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block' }}>Ár (FT)</label>
+                                  <input 
+                                    type="number" 
+                                    className="input-field" 
+                                    style={{ height: '42px', fontSize: '14px', padding: '0 12px', borderRadius: '8px' }}
+                                    value={newItemPrice} 
+                                    onChange={e => setNewItemPrice(parseInt(e.target.value) || 0)} 
+                                  />
+                                </div>
 
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                      <div>
-                                        <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Típus</label>
-                                        <AppleSelect
-                                          value={promoType}
-                                          onChange={val => setPromoType(val as 'once' | 'recurring')}
-                                          options={[
-                                            { value: 'once', label: 'Egy alkalommal' },
-                                            { value: 'recurring', label: 'Ismétlődő' }
-                                          ]}
-                                          icon={<Activity size={12} />}
-                                          isOpen={openPromoTypeDropdown}
-                                          onToggle={() => setOpenPromoTypeDropdown(!openPromoTypeDropdown)}
-                                          onClose={() => setOpenPromoTypeDropdown(false)}
-                                        />
-                                      </div>
+                                <div>
+                                  <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block' }}>Csomagolás</label>
+                                  <AppleSelect
+                                    value={newItemPackType}
+                                    onChange={val => {
+                                      const type = String(val);
+                                      setNewItemPackType(type);
+                                      if (type === 'none') {
+                                        setNewItemPackFee(0);
+                                      } else {
+                                        setNewItemPackFee(db.packagingFees[type] || 0);
+                                      }
+                                    }}
+                                    options={[
+                                      { value: 'none', label: 'Nincs csomagolás (0 FT)' },
+                                      ...Object.keys(db.packagingFees).map(key => ({
+                                        value: key,
+                                        label: key === 'pizza' ? 'Pizza doboz' : key === 'box' ? 'Elv. doboz' : key === 'cup' ? 'Pohár' : key
+                                      }))
+                                    ]}
+                                    icon={<Package size={14} />}
+                                    isOpen={openItemPackDropdown}
+                                    onToggle={() => setOpenItemPackDropdown(!openItemPackDropdown)}
+                                    onClose={() => setOpenItemPackDropdown(false)}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
 
-                                      {promoType === 'once' ? (
-                                        <div>
-                                          <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Dátum</label>
-                                          <input 
-                                            type="date"
-                                            className="input-field"
-                                            style={{ height: '32px', fontSize: '12px' }}
-                                            value={promoOnceDate}
-                                            onChange={e => setPromoOnceDate(e.target.value)}
+                          {/* TAB 2: PROMOTION / TIMING */}
+                          {editingItemTab === 'promo' && (
+                            <div ref={tabContentRef} style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '10px 0' }}>
+                              {(() => {
+                                const itemCategory = db.categories.find((c: any) => c.id === newItemCatId);
+                                const hasCategoryPromotion = !!(itemCategory && itemCategory.promotion?.isEnabled);
+                                const categoryName = itemCategory ? itemCategory.name : '';
+                                return (
+                                  <div ref={promoPanelRef} style={{
+                                    border: '1px solid rgba(255,255,255,0.08)',
+                                    borderRadius: '12px',
+                                    padding: '24px',
+                                    background: 'rgba(255,255,255,0.02)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '20px'
+                                  }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <span style={{ fontSize: '15px', fontWeight: 700, color: '#0a84ff' }}>
+                                        Időzített Árazás & Akciók Beállítása
+                                      </span>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', userSelect: 'none' }}>
+                                        <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                          {promoIsEnabled ? 'Aktív' : 'Deaktív'}
+                                        </span>
+                                        <div 
+                                          onClick={() => {
+                                            const nextVal = !promoIsEnabled;
+                                            setPromoIsEnabled(nextVal);
+                                            if (nextVal) {
+                                              setTimeout(() => {
+                                                promoPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                                              }, 80);
+                                            }
+                                          }}
+                                          style={{
+                                            width: '44px',
+                                            height: '24px',
+                                            borderRadius: '12px',
+                                            background: promoIsEnabled ? '#30d158' : 'rgba(255,255,255,0.15)',
+                                            position: 'relative',
+                                            cursor: 'pointer',
+                                            transition: 'background-color 0.2s ease',
+                                            boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)'
+                                          }}
+                                        >
+                                          <div 
+                                            style={{
+                                              width: '20px',
+                                              height: '20px',
+                                              borderRadius: '50%',
+                                              background: 'white',
+                                              position: 'absolute',
+                                              top: '2px',
+                                              left: promoIsEnabled ? '22px' : '2px',
+                                              transition: 'left 0.2s ease',
+                                              boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
+                                            }}
                                           />
                                         </div>
-                                      ) : (
-                                        <div>
-                                          <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Gyakoriság</label>
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                      </div>
+                                    </div>
+
+                                    {promoIsEnabled ? (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', borderTop: '1px dashed rgba(255,255,255,0.08)', paddingTop: '20px' }}>
+                                        {hasCategoryPromotion && (
+                                          <div style={{
+                                            background: 'rgba(255, 159, 10, 0.12)',
+                                            border: '1px solid rgba(255, 159, 10, 0.25)',
+                                            borderRadius: '8px',
+                                            padding: '12px 16px',
+                                            color: '#ff9f0a',
+                                            fontSize: '13px',
+                                            lineHeight: '1.5',
+                                            fontWeight: 500
+                                          }}>
+                                            ⚠️ Figyelem: A(z) <strong>{categoryName}</strong> kategóriára már be van állítva egy aktív árazási szabály. Ha ide is beállítasz egy szabályt, az felülírja a kategória szintű beállítást (ez az étel prioritást élvez).
+                                          </div>
+                                        )}
+
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                          <div>
+                                            <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block' }}>Típus</label>
+                                            <AppleSelect
+                                              value={promoType}
+                                              onChange={val => setPromoType(val as 'once' | 'recurring')}
+                                              options={[
+                                                { value: 'once', label: 'Egy alkalommal' },
+                                                { value: 'recurring', label: 'Ismétlődő' }
+                                              ]}
+                                              icon={<Activity size={14} />}
+                                              isOpen={openPromoTypeDropdown}
+                                              onToggle={() => setOpenPromoTypeDropdown(!openPromoTypeDropdown)}
+                                              onClose={() => setOpenPromoTypeDropdown(false)}
+                                            />
+                                          </div>
+
+                                          {promoType === 'once' ? (
+                                            <div>
+                                              <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block' }}>Dátum</label>
+                                              <input 
+                                                type="date"
+                                                className="input-field"
+                                                style={{ height: '42px', fontSize: '14px', padding: '0 12px', borderRadius: '8px' }}
+                                                value={promoOnceDate}
+                                                onChange={e => setPromoOnceDate(e.target.value)}
+                                              />
+                                            </div>
+                                          ) : (
+                                            <div>
+                                              <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block' }}>Gyakoriság</label>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <input 
+                                                  type="number"
+                                                  className="input-field"
+                                                  style={{ height: '42px', fontSize: '14px', width: '80px', padding: '0 12px', borderRadius: '8px' }}
+                                                  min={1}
+                                                  value={promoRecurringWeeksInterval}
+                                                  onChange={e => setPromoRecurringWeeksInterval(Math.max(1, parseInt(e.target.value) || 1))}
+                                                />
+                                                <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>hetenként</span>
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        {promoType === 'recurring' && (
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                            <div>
+                                              <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '10px', display: 'block' }}>Ismétlődés napjai</label>
+                                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                                {[
+                                                  { val: 1, label: 'Hétfő' },
+                                                  { val: 2, label: 'Kedd' },
+                                                  { val: 3, label: 'Szerda' },
+                                                  { val: 4, label: 'Csütörtök' },
+                                                  { val: 5, label: 'Péntek' },
+                                                  { val: 6, label: 'Szombat' },
+                                                  { val: 7, label: 'Vasárnap' }
+                                                ].map(day => {
+                                                  const isSelected = promoRecurringDays.includes(day.val);
+                                                  return (
+                                                    <button
+                                                      key={day.val}
+                                                      type="button"
+                                                      onClick={() => {
+                                                        if (isSelected) {
+                                                          setPromoRecurringDays(promoRecurringDays.filter(d => d !== day.val));
+                                                        } else {
+                                                          setPromoRecurringDays([...promoRecurringDays, day.val].sort());
+                                                        }
+                                                      }}
+                                                      style={{
+                                                        padding: '10px 18px',
+                                                        borderRadius: '8px',
+                                                        border: '1px solid rgba(255,255,255,0.08)',
+                                                        background: isSelected ? '#0a84ff' : 'rgba(0,0,0,0.2)',
+                                                        color: 'white',
+                                                        fontSize: '13px',
+                                                        fontWeight: 600,
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.15s ease'
+                                                      }}
+                                                    >
+                                                      {day.label}
+                                                    </button>
+                                                  );
+                                                })}
+                                              </div>
+                                            </div>
+
+                                            {promoRecurringWeeksInterval > 1 && (
+                                              <div>
+                                                <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block' }}>Kezdő dátum (referencia hét)</label>
+                                                <input 
+                                                  type="date"
+                                                  className="input-field"
+                                                  style={{ height: '42px', fontSize: '14px', padding: '0 12px', borderRadius: '8px' }}
+                                                  value={promoRecurringStartDate}
+                                                  onChange={e => setPromoRecurringStartDate(e.target.value)}
+                                                />
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                          <div>
+                                            <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block' }}>Módosítás típusa</label>
+                                            <AppleSelect
+                                              value={promoPriceAdjustmentType}
+                                              onChange={val => setPromoPriceAdjustmentType(val as 'percent' | 'fixed')}
+                                              options={[
+                                                { value: 'percent', label: 'Százalékos kedvezmény / felár (%)' },
+                                                { value: 'fixed', label: 'Fix összegű akciós ár (FT)' }
+                                              ]}
+                                              icon={<Layers size={14} />}
+                                              isOpen={openPromoPriceDropdown}
+                                              onToggle={() => setOpenPromoPriceDropdown(!openPromoPriceDropdown)}
+                                              onClose={() => setOpenPromoPriceDropdown(false)}
+                                            />
+                                          </div>
+
+                                          <div>
+                                            <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block' }}>
+                                              {promoPriceAdjustmentType === 'percent' ? 'Módosítás mértéke (pl. -10 vagy +15) (%)' : 'Új akciós ár (FT)'}
+                                            </label>
                                             <input 
                                               type="number"
                                               className="input-field"
-                                              style={{ height: '32px', fontSize: '12px', width: '60px' }}
-                                              min={1}
-                                              value={promoRecurringWeeksInterval}
-                                              onChange={e => setPromoRecurringWeeksInterval(Math.max(1, parseInt(e.target.value) || 1))}
+                                              style={{ height: '42px', fontSize: '14px', padding: '0 12px', borderRadius: '8px' }}
+                                              value={promoPriceAdjustmentValue}
+                                              onChange={e => setPromoPriceAdjustmentValue(parseInt(e.target.value) || 0)}
+                                              placeholder={promoPriceAdjustmentType === 'percent' ? 'pl: -10' : 'pl: 1500'}
                                             />
-                                            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>hetenként</span>
                                           </div>
                                         </div>
-                                      )}
-                                    </div>
 
-                                    {promoType === 'recurring' && (
-                                      <>
                                         <div>
-                                          <label className="input-label" style={{ fontSize: '11px', marginBottom: '6px' }}>Napok</label>
-                                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                            {[
-                                              { val: 1, label: 'H' },
-                                              { val: 2, label: 'K' },
-                                              { val: 3, label: 'Sze' },
-                                              { val: 4, label: 'Cs' },
-                                              { val: 5, label: 'P' },
-                                              { val: 6, label: 'Szo' },
-                                              { val: 7, label: 'V' }
-                                            ].map(day => {
-                                              const isSelected = promoRecurringDays.includes(day.val);
-                                              return (
-                                                <button
-                                                  key={day.val}
-                                                  type="button"
-                                                  onClick={() => {
-                                                    if (isSelected) {
-                                                      setPromoRecurringDays(promoRecurringDays.filter(d => d !== day.val));
-                                                    } else {
-                                                      setPromoRecurringDays([...promoRecurringDays, day.val].sort());
-                                                    }
-                                                  }}
-                                                  style={{
-                                                    width: '30px',
-                                                    height: '30px',
-                                                    borderRadius: '6px',
-                                                    border: '1px solid rgba(255,255,255,0.08)',
-                                                    background: isSelected ? 'var(--primary)' : 'rgba(0,0,0,0.2)',
-                                                    color: 'white',
-                                                    fontSize: '11px',
-                                                    fontWeight: 600,
-                                                    cursor: 'pointer',
-                                                    transition: 'all 0.15s ease'
-                                                  }}
-                                                >
-                                                  {day.label}
-                                                </button>
-                                              );
-                                            })}
-                                          </div>
+                                          <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block' }}>Csomagolási díj kezelése akció alatt</label>
+                                          <AppleSelect
+                                            value={promoPackagingFeePolicy}
+                                            onChange={val => setPromoPackagingFeePolicy(val as 'standard' | 'free' | 'discounted')}
+                                            options={[
+                                              { value: 'standard', label: 'Rendes árán marad' },
+                                              { value: 'free', label: 'Ingyenes csomagolás az akciós napokon' },
+                                              { value: 'discounted', label: 'Ugyanaz a százalékos kedvezmény jöjjön le belőle' }
+                                            ]}
+                                            icon={<Package size={14} />}
+                                            isOpen={openPromoPackDropdown}
+                                            onToggle={() => setOpenPromoPackDropdown(!openPromoPackDropdown)}
+                                            onClose={() => setOpenPromoPackDropdown(false)}
+                                            openUpward={true}
+                                          />
                                         </div>
-
-                                        {promoRecurringWeeksInterval > 1 && (
-                                          <div>
-                                            <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Kezdő dátum (hét számoláshoz)</label>
-                                            <input 
-                                              type="date"
-                                              className="input-field"
-                                              style={{ height: '32px', fontSize: '12px' }}
-                                              value={promoRecurringStartDate}
-                                              onChange={e => setPromoRecurringStartDate(e.target.value)}
-                                            />
-                                          </div>
-                                        )}
-                                      </>
+                                      </div>
+                                    ) : (
+                                      <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-secondary)', border: '1px dashed rgba(255,255,255,0.06)', borderRadius: '8px' }}>
+                                        <span style={{ fontSize: '14px', fontStyle: 'italic' }}>Az időzített árazások nincsenek engedélyezve ehhez az ételhez.</span>
+                                      </div>
                                     )}
-
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                      <div>
-                                        <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Módosítás típusa</label>
-                                        <AppleSelect
-                                          value={promoPriceAdjustmentType}
-                                          onChange={val => setPromoPriceAdjustmentType(val as 'percent' | 'fixed')}
-                                          options={[
-                                            { value: 'percent', label: 'Százalékos' },
-                                            { value: 'fixed', label: 'Fix összeg' }
-                                          ]}
-                                          icon={<Layers size={12} />}
-                                          isOpen={openPromoPriceDropdown}
-                                          onToggle={() => setOpenPromoPriceDropdown(!openPromoPriceDropdown)}
-                                          onClose={() => setOpenPromoPriceDropdown(false)}
-                                        />
-                                      </div>
-
-                                      <div>
-                                        <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>
-                                          {promoPriceAdjustmentType === 'percent' ? 'Módosítás (%)' : 'Új Fix Ár (FT)'}
-                                        </label>
-                                        <input 
-                                          type="number"
-                                          className="input-field"
-                                          style={{ height: '32px', fontSize: '12px' }}
-                                          value={promoPriceAdjustmentValue}
-                                          onChange={e => setPromoPriceAdjustmentValue(parseInt(e.target.value) || 0)}
-                                          placeholder={promoPriceAdjustmentType === 'percent' ? 'pl: -10 vagy +15' : 'pl: 1500'}
-                                        />
-                                      </div>
-                                    </div>
-
-                                    <div>
-                                      <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Csomagolási díj kezelése</label>
-                                      <AppleSelect
-                                        value={promoPackagingFeePolicy}
-                                        onChange={val => setPromoPackagingFeePolicy(val as 'standard' | 'free' | 'discounted')}
-                                        options={[
-                                          { value: 'standard', label: 'Rendes árán marad' },
-                                          { value: 'free', label: 'Ingyenes csomagolás' },
-                                          { value: 'discounted', label: 'Ugyanaz a % kedvezmény jöjjön le' }
-                                        ]}
-                                        icon={<Package size={12} />}
-                                        isOpen={openPromoPackDropdown}
-                                        onToggle={() => setOpenPromoPackDropdown(!openPromoPackDropdown)}
-                                        onClose={() => setOpenPromoPackDropdown(false)}
-                                        openUpward={true}
-                                      />
-                                    </div>
                                   </div>
-                                )}
+                                );
+                              })()}
+                            </div>
+                          )}
+
+                          {/* TAB 3: INGREDIENTS */}
+                          {editingItemTab === 'ingredients' && (
+                            <div ref={tabContentRef} style={{
+                              display: 'grid',
+                              gridTemplateColumns: '1.2fr 1fr',
+                              gap: '24px',
+                              padding: '10px 0',
+                            }}>
+                              {/* Column A: Existing Ingredients List */}
+                              <div style={{ 
+                                background: 'rgba(255, 255, 255, 0.01)', 
+                                border: '1px solid rgba(255, 255, 255, 0.05)', 
+                                borderRadius: '12px', 
+                                padding: '20px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                maxHeight: '430px'
+                              }}>
+                                <span style={{ fontSize: '14px', fontWeight: 700, color: '#30d158', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                                  <Package size={18} /> Receptek & Recept összetevők ({newItemIngredients.length} db)
+                                </span>
+
+                                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingRight: '8px' }}>
+                                  {newItemIngredients.map((ing: any) => {
+                                    const invItem = db.inventory.find((i: any) => i.id === ing.ingredientId);
+                                    if (!invItem) return null;
+                                    const allergens = detectAllergens(invItem.name);
+
+                                    return (
+                                      <div key={ing.ingredientId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.15)', padding: '12px 16px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.04)', transition: 'all 0.15s ease' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                          <span style={{ fontSize: '14px', fontWeight: 600, color: 'white' }}>
+                                            {invItem.name}
+                                          </span>
+                                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                            Szükséges mennyiség: <strong style={{ color: 'var(--primary)', fontSize: '13px' }}>{ing.quantity} {invItem.unit}</strong>
+                                          </span>
+                                          {allergens.length > 0 && (
+                                            <div style={{ display: 'flex', gap: '6px', marginTop: '6px', flexWrap: 'wrap' }}>
+                                              {allergens.map((a: any) => (
+                                                <span 
+                                                  key={a.code} 
+                                                  style={{ background: 'rgba(255,159,10,0.12)', border: '1px solid rgba(255,159,10,0.25)', color: '#ff9f0a', fontSize: '10px', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}
+                                                  title={"EU Allergén: " + a.name}
+                                                >
+                                                  ⚠️ {a.name}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                        <button 
+                                          type="button"
+                                          className="btn" 
+                                          style={{ padding: '8px 12px', background: 'rgba(255,69,58,0.12)', color: '#ff453a', border: '1px solid rgba(255,69,58,0.2)', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.15s ease' }}
+                                          onClick={() => {
+                                            setNewItemIngredients(newItemIngredients.filter((i: any) => i.ingredientId !== ing.ingredientId));
+                                          }}
+                                        >
+                                          <Trash2 size={14} />
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                  {newItemIngredients.length === 0 && (
+                                    <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: '200px', flexDirection: 'column', gap: '10px', color: 'var(--text-secondary)', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: '10px', padding: '24px' }}>
+                                      <span style={{ fontSize: '14px', fontStyle: 'italic' }}>Még nincsenek alapanyagok hozzáadva.</span>
+                                      <span style={{ fontSize: '12px', textAlign: 'center', opacity: 0.6 }}>Használd a jobb oldali panelt a recept összeállításához!</span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            );
-                          })()}
 
-                          {/* Action buttons */}
-                          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '6px' }}>
-                            <button className="btn" onClick={() => setEditingItem(null)}>Mégse</button>
-                            <button 
-                              className="btn btn-primary"
-                              onClick={() => {
-                                if (!newItemName.trim()) return;
+                              {/* Column B: Add New Ingredient Form */}
+                              <div style={{ 
+                                background: 'rgba(0, 0, 0, 0.12)', 
+                                border: '1px solid rgba(255, 255, 255, 0.04)', 
+                                borderRadius: '12px', 
+                                padding: '20px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'center',
+                                gap: '16px'
+                              }}>
+                                <span style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                  Új összetevő hozzáadása
+                                </span>
 
-                                // Auto compute unique allergens list
-                                const uniqueAllergens = new Set<string>();
-                                newItemIngredients.forEach((ing) => {
-                                  const inv = db.inventory.find((i: any) => i.id === ing.ingredientId);
-                                  if (inv) {
-                                    const matches = detectAllergens(inv.name);
-                                    matches.forEach(m => uniqueAllergens.add(m.code));
-                                  }
-                                });
-                                const finalAllergens = Array.from(uniqueAllergens).sort((a, b) => parseInt(a) - parseInt(b));
+                                <div>
+                                  <label className="input-label" style={{ fontSize: '12px', fontWeight: 600, marginBottom: '6px', display: 'block' }}>Alapanyag választása</label>
+                                  <AppleSelect
+                                    value={selectedAddIngredientId || ''}
+                                    onChange={val => setSelectedAddIngredientId(Number(val) || null)}
+                                    options={db.inventory
+                                      .filter((inv: any) => !newItemIngredients.some((ing: any) => ing.ingredientId === inv.id))
+                                      .map((inv: any) => ({
+                                        value: inv.id,
+                                        label: inv.name
+                                      }))
+                                    }
+                                    icon={<Package size={14} />}
+                                    isOpen={openItemIngredDropdown}
+                                    onToggle={() => setOpenItemIngredDropdown(!openItemIngredDropdown)}
+                                    onClose={() => setOpenItemIngredDropdown(false)}
+                                    openUpward={true}
+                                  />
+                                </div>
 
-                                const promoObj: PromotionSettings = {
-                                  isEnabled: promoIsEnabled,
-                                  type: promoType,
-                                  onceDate: promoType === 'once' ? promoOnceDate : undefined,
-                                  recurringDays: promoType === 'recurring' ? promoRecurringDays : undefined,
-                                  recurringWeeksInterval: promoType === 'recurring' ? promoRecurringWeeksInterval : undefined,
-                                  recurringStartDate: promoType === 'recurring' && promoRecurringWeeksInterval > 1 ? promoRecurringStartDate : undefined,
-                                  priceAdjustmentType: promoPriceAdjustmentType,
-                                  priceAdjustmentValue: promoPriceAdjustmentValue,
-                                  packagingFeePolicy: promoPackagingFeePolicy
-                                };
+                                <div>
+                                  <label className="input-label" style={{ fontSize: '12px', fontWeight: 600, marginBottom: '6px', display: 'block' }}>
+                                    Mennyiség ({db.inventory.find((i: any) => i.id === selectedAddIngredientId)?.unit || 'egység'})
+                                  </label>
+                                  <input
+                                    type="number"
+                                    className="input-field"
+                                    style={{ height: '42px', fontSize: '14px', padding: '0 12px', borderRadius: '8px' }}
+                                    value={selectedAddIngredientQty}
+                                    onChange={e => setSelectedAddIngredientQty(parseFloat(e.target.value) || 0)}
+                                    step="any"
+                                  />
+                                </div>
 
-                                let updatedItems = [...db.items];
-                                if (editingItem.id === 0) {
-                                  const newId = db.items.length > 0 ? Math.max(...db.items.map((i: any) => i.id)) + 1 : 1;
-                                  updatedItems.push({
-                                    id: newId,
-                                    category_id: newItemCatId,
-                                    name: newItemName,
-                                    price: newItemPrice,
-                                    packaging_fee: newItemPackFee,
-                                    packaging_type: newItemPackType,
-                                    description: newItemDescription,
-                                    ingredients: newItemIngredients,
-                                    allergens: finalAllergens,
-                                    promotion: promoObj
-                                  } as any);
-                                } else {
-                                  updatedItems = db.items.map((i: any) => i.id === editingItem.id ? {
-                                    ...i,
-                                    name: newItemName,
-                                    price: newItemPrice,
-                                    packaging_fee: newItemPackFee,
-                                    packaging_type: newItemPackType,
-                                    description: newItemDescription,
-                                    ingredients: newItemIngredients,
-                                    allergens: finalAllergens,
-                                    promotion: promoObj
-                                  } : i);
-                                }
-                                saveDatabase({ ...db, items: updatedItems });
-                                setEditingItem(null);
-                              }}
-                            >
-                              Mentés
-                            </button>
-                          </div>
+                                <button
+                                  type="button"
+                                  className="btn btn-primary"
+                                  style={{ height: '44px', padding: '0 20px', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', borderRadius: '8px', width: '100%', fontWeight: 600 }}
+                                  onClick={() => {
+                                    if (!selectedAddIngredientId || selectedAddIngredientQty <= 0) return;
+                                    setNewItemIngredients([
+                                      ...newItemIngredients,
+                                      { ingredientId: selectedAddIngredientId, quantity: selectedAddIngredientQty }
+                                    ]);
+                                    // Reset select to next available in inventory
+                                    const remaining = db.inventory.filter((inv: any) => 
+                                      inv.id !== selectedAddIngredientId && 
+                                      !newItemIngredients.some((ing: any) => ing.ingredientId === inv.id)
+                                    );
+                                    if (remaining.length > 0) {
+                                      setSelectedAddIngredientId(remaining[0].id);
+                                    } else {
+                                      setSelectedAddIngredientId(null);
+                                    }
+                                    setSelectedAddIngredientQty(1);
+                                  }}
+                                  disabled={!selectedAddIngredientId}
+                                >
+                                  <Plus size={16} /> Alapanyag Hozzáadása
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
                         </div>
 
+                        {/* Modal Footer actions */}
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '10px', paddingTop: '14px', borderTop: '1px solid var(--glass-border)' }}>
+                          <button 
+                            type="button"
+                            className="btn" 
+                            style={{ padding: '10px 28px', borderRadius: '20px', fontWeight: 600, background: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', fontSize: '13px' }}
+                            onClick={() => setEditingItem(null)}
+                          >
+                            Mégse
+                          </button>
+                          <button 
+                            type="button"
+                            className="btn btn-primary"
+                            style={{ padding: '10px 28px', borderRadius: '20px', fontWeight: 600, background: '#0a84ff', color: 'white', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(10,132,255,0.3)', fontSize: '13px' }}
+                            onClick={() => {
+                              if (!newItemName.trim()) return;
+
+                              // Auto compute unique allergens list
+                              const uniqueAllergens = new Set();
+                              newItemIngredients.forEach((ing: any) => {
+                                const inv = db.inventory.find((i: any) => i.id === ing.ingredientId);
+                                if (inv) {
+                                  const matches = detectAllergens(inv.name);
+                                  matches.forEach((m: any) => uniqueAllergens.add(m.code));
+                                }
+                              });
+                              const finalAllergens = Array.from(uniqueAllergens).sort((a: any, b: any) => parseInt(a) - parseInt(b));
+
+                              const promoObj = {
+                                isEnabled: promoIsEnabled,
+                                type: promoType,
+                                onceDate: promoType === 'once' ? promoOnceDate : undefined,
+                                recurringDays: promoType === 'recurring' ? promoRecurringDays : undefined,
+                                recurringWeeksInterval: promoType === 'recurring' ? promoRecurringWeeksInterval : undefined,
+                                recurringStartDate: promoType === 'recurring' && promoRecurringWeeksInterval > 1 ? promoRecurringStartDate : undefined,
+                                priceAdjustmentType: promoPriceAdjustmentType,
+                                priceAdjustmentValue: promoPriceAdjustmentValue,
+                                packagingFeePolicy: promoPackagingFeePolicy
+                              };
+
+                              let updatedItems = [...db.items];
+                              if (editingItem.id === 0) {
+                                const newId = db.items.length > 0 ? Math.max(...db.items.map((i: any) => i.id)) + 1 : 1;
+                                updatedItems.push({
+                                  id: newId,
+                                  category_id: newItemCatId,
+                                  name: newItemName,
+                                  price: newItemPrice,
+                                  packaging_fee: newItemPackFee,
+                                  packaging_type: newItemPackType,
+                                  description: newItemDescription,
+                                  ingredients: newItemIngredients,
+                                  allergens: finalAllergens,
+                                  promotion: promoObj
+                                });
+                              } else {
+                                updatedItems = db.items.map((i: any) => i.id === editingItem.id ? {
+                                  ...i,
+                                  name: newItemName,
+                                  price: newItemPrice,
+                                  packaging_fee: newItemPackFee,
+                                  packaging_type: newItemPackType,
+                                  description: newItemDescription,
+                                  ingredients: newItemIngredients,
+                                  allergens: finalAllergens,
+                                  promotion: promoObj
+                                } : i);
+                              }
+                              saveDatabase({ ...db, items: updatedItems });
+                              setEditingItem(null);
+                            }}
+                          >
+                            Mentés
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
-
                   {/* Add / Edit Category Modal Overlay */}
                   {editingCategory && (
                     <div className="modal-overlay" onClick={() => setEditingCategory(null)}>
