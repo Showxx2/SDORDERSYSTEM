@@ -987,6 +987,21 @@ export default function App() {
   // Active Order Selection (for detail preview if clicked)
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
 
+  // Custom Confirm Modal states
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmModalTitle, setConfirmModalTitle] = useState('Megerősítés');
+  const [confirmModalMessage, setConfirmModalMessage] = useState('');
+  const [confirmButtonText, setConfirmButtonText] = useState('Törlés');
+  const [onConfirmAction, setOnConfirmAction] = useState<(() => void) | null>(null);
+
+  const customConfirm = (message: string, onConfirm: () => void, title: string = 'Biztos vagy benne?', buttonText: string = 'Törlés') => {
+    setConfirmModalTitle(title);
+    setConfirmModalMessage(message);
+    setConfirmButtonText(buttonText);
+    setOnConfirmAction(() => onConfirm);
+    setShowConfirmModal(true);
+  };
+
   // Admin Panel States
   const [adminTab, setAdminTab] = useState<'stats' | 'menu' | 'packaging' | 'inventory' | 'permissions' | 'dispatch' | 'delivery' | 'history' | 'schedule' | 'settings'>('stats');
   
@@ -1792,12 +1807,12 @@ export default function App() {
       alert('Nem törölheted a saját fiókodat, amivel be vagy jelentkezve!');
       return;
     }
-    if (confirm('Biztosan törölni szeretnéd ezt a felhasználót?')) {
+    customConfirm('Biztosan törölni szeretnéd ezt a felhasználót?', () => {
       const updatedUsers = db.users.filter((u: any) => u.id !== userId);
       setActiveSessions(prev => prev.filter(s => s.userId !== userId));
       saveDatabase({ ...db, users: updatedUsers });
       setEditingUserItem(null);
-    }
+    });
   };
 
   const handleAddShift = () => {
@@ -1843,10 +1858,10 @@ export default function App() {
   };
 
   const handleDeleteShift = (shiftId: string) => {
-    if (confirm('Biztosan törölni szeretnéd ezt a beosztást?')) {
+    customConfirm('Biztosan törölni szeretnéd ezt a beosztást?', () => {
       const updatedShifts = (db.shifts || []).filter((s: any) => s.id !== shiftId);
       saveDatabase({ ...db, shifts: updatedShifts });
-    }
+    });
   };
 
   const handleKickUser = (userId: number) => {
@@ -7287,10 +7302,10 @@ export default function App() {
                                         className="btn" 
                                         style={{ padding: '6px 14px', fontSize: '12px', background: 'rgba(255,69,58,0.12)', color: '#ff453a', border: '1px solid rgba(255,69,58,0.25)', borderRadius: '20px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s ease' }}
                                         onClick={() => {
-                                          if (window.confirm(`Biztosan törlöd a(z) "${item.name}" ételt?`)) {
+                                          customConfirm(`Biztosan törlöd a(z) "${item.name}" ételt?`, () => {
                                             const updated = db.items.filter((i: any) => i.id !== item.id);
                                             saveDatabase({ ...db, items: updated });
-                                          }
+                                          });
                                         }}
                                       >
                                         Törlés
@@ -7358,10 +7373,10 @@ export default function App() {
                                         className="btn" 
                                         style={{ padding: '6px 14px', fontSize: '12px', background: 'rgba(255,69,58,0.12)', color: '#ff453a', border: '1px solid rgba(255,69,58,0.25)', borderRadius: '20px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s ease' }}
                                         onClick={() => {
-                                          if (window.confirm(`Biztosan törlöd a(z) "${cat.name}" kategóriát? A benne lévő ételek kategória nélkül maradnak.`)) {
+                                          customConfirm(`Biztosan törlöd a(z) "${cat.name}" kategóriát? A benne lévő ételek kategória nélkül maradnak.`, () => {
                                             const updated = db.categories.filter((c: any) => c.id !== cat.id);
                                             saveDatabase({ ...db, categories: updated });
-                                          }
+                                          });
                                         }}
                                       >
                                         Törlés
@@ -7455,19 +7470,19 @@ export default function App() {
                               <button 
                                 className="btn btn-danger" 
                                 style={{ flex: 1, padding: '6px 0', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
-                                onClick={() => {
-                                  if (window.confirm(`Biztosan törlöd a(z) "${displayName}" csomagolást? A hozzá tartozó ételek csomagolása ingyenesre áll át.`)) {
-                                    const updatedFees = { ...db.packagingFees };
-                                    delete updatedFees[key];
-                                    const updatedItems = db.items.map((item: any) => {
-                                      if (item.packaging_type === key) {
-                                        return { ...item, packaging_type: 'none', packaging_fee: 0 };
-                                      }
-                                      return item;
-                                    });
-                                    saveDatabase({ ...db, packagingFees: updatedFees, items: updatedItems });
-                                  }
-                                }}
+                                        onClick={() => {
+                                          customConfirm(`Biztosan törlöd a(z) "${displayName}" csomagolást? A hozzá tartozó ételek csomagolása ingyenesre áll át.`, () => {
+                                            const updatedFees = { ...db.packagingFees };
+                                            delete updatedFees[key];
+                                            const updatedItems = db.items.map((item: any) => {
+                                              if (item.packaging_type === key) {
+                                                return { ...item, packaging_type: 'none', packaging_fee: 0 };
+                                              }
+                                              return item;
+                                            });
+                                            saveDatabase({ ...db, packagingFees: updatedFees, items: updatedItems });
+                                          });
+                                        }}
                               >
                                 Töröl
                               </button>
@@ -7865,10 +7880,10 @@ export default function App() {
                                             className="btn btn-danger" 
                                             style={{ background: '#ff453a', border: 'none', color: 'white', borderRadius: '14px', padding: '6px 12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', boxShadow: '0 0 10px rgba(255,69,58,0.3)' }}
                                             onClick={() => {
-                                              if (confirm(`Biztosan törölni szeretnéd a(z) ${inv.name} raktárcikket?`)) {
+                                              customConfirm(`Biztosan törölni szeretnéd a(z) ${inv.name} raktárcikket?`, () => {
                                                 const updated = inventory.filter((i: any) => i.id !== inv.id);
                                                 saveDatabase({ ...db, inventory: updated });
-                                              }
+                                              });
                                             }}
                                           >
                                             Töröl
@@ -7955,10 +7970,10 @@ export default function App() {
                                                 alert('Nem törölheted ezt a kategóriát, mert jelenleg még tartoznak alá raktárcikkek! Először sorold át őket más kategóriába.');
                                                 return;
                                               }
-                                              if (confirm(`Biztosan törölni szeretnéd a(z) ${cat.name} raktár kategóriát?`)) {
+                                              customConfirm(`Biztosan törölni szeretnéd a(z) ${cat.name} raktár kategóriát?`, () => {
                                                 const updated = invCategories.filter((c: any) => c.id !== cat.id);
                                                 saveDatabase({ ...db, inventoryCategories: updated });
-                                              }
+                                              });
                                             }}
                                           >
                                             Töröl
@@ -8039,18 +8054,18 @@ export default function App() {
                                           <button 
                                             className="btn btn-danger" 
                                             style={{ background: '#ff453a', border: 'none', color: 'white', borderRadius: '14px', padding: '6px 12px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', boxShadow: '0 0 10px rgba(255,69,58,0.3)' }}
-                                            onClick={() => {
-                                              // Data integrity check: check if any items are bound to this supplier
-                                              const hasItems = inventory.some((i: any) => i.supplier_id === supp.id);
-                                              if (hasItems) {
-                                                alert('Nem törölheted ezt a beszerzési helyet, mert jelenleg még kapcsolódnak hozzá raktárcikkek!');
-                                                return;
-                                              }
-                                              if (confirm(`Biztosan törölni szeretnéd a(z) ${supp.name} beszerzési helyet?`)) {
-                                                const updated = suppliers.filter((s: any) => s.id !== supp.id);
-                                                saveDatabase({ ...db, suppliers: updated });
-                                              }
-                                            }}
+                                              onClick={() => {
+                                                // Data integrity check: check if any items are bound to this supplier
+                                                const hasItems = inventory.some((i: any) => i.supplier_id === supp.id);
+                                                if (hasItems) {
+                                                  alert('Nem törölheted ezt a beszerzési helyet, mert jelenleg még kapcsolódnak hozzá raktárcikkek!');
+                                                  return;
+                                                }
+                                                customConfirm(`Biztosan törölni szeretnéd a(z) ${supp.name} beszerzési helyet?`, () => {
+                                                  const updated = suppliers.filter((s: any) => s.id !== supp.id);
+                                                  saveDatabase({ ...db, suppliers: updated });
+                                                });
+                                              }}
                                           >
                                             Töröl
                                           </button>
@@ -9732,13 +9747,13 @@ export default function App() {
                                             className="btn btn-danger"
                                             style={{ padding: '4px 8px', fontSize: '11px' }}
                                             onClick={() => {
-                                              if (confirm(`Biztosan törölni szeretnéd a(z) ${s.city} települést?`)) {
+                                              customConfirm(`Biztosan törölni szeretnéd a(z) ${s.city} települést?`, () => {
                                                 const updated = settlements.filter((x: any) => x.id !== s.id);
                                                 saveDatabase({
                                                   ...db,
                                                   deliveryFees: { ...config, settlements: updated }
                                                 });
-                                              }
+                                              });
                                             }}
                                           >
                                             <Trash2 size={12} />
@@ -10078,13 +10093,13 @@ export default function App() {
                                     className="btn btn-danger"
                                     style={{ padding: '4px 8px', fontSize: '11px' }}
                                     onClick={() => {
-                                      if (confirm(`Biztosan törölni szeretnéd a(z) ${s.city} települést az ingyenes listáról?`)) {
+                                      customConfirm(`Biztosan törölni szeretnéd a(z) ${s.city} települést az ingyenes listáról?`, () => {
                                         const updated = (config.freeSettlements || []).filter((x: any) => x.id !== s.id);
                                         saveDatabase({
                                           ...db,
                                           deliveryFees: { ...config, freeSettlements: updated }
                                         });
-                                      }
+                                      });
                                     }}
                                   >
                                     <Trash2 size={12} />
@@ -11578,6 +11593,61 @@ export default function App() {
         );
       })()}
 
+
+      {/* ================= MODAL: EGYEDI MEGERŐSÍTÉS (CUSTOM CONFIRM) ================= */}
+      {showConfirmModal && (
+        <div className="modal-overlay" onClick={() => setShowConfirmModal(false)}>
+          <div 
+            className="modal-card" 
+            style={{ 
+              maxWidth: '380px', 
+              background: 'var(--panel-bg)', 
+              border: '1px solid var(--glass-border)', 
+              padding: '20px', 
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '14px',
+              boxShadow: '0 12px 40px rgba(0, 0, 0, 0.4)'
+            }} 
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'white' }}>{confirmModalTitle}</h3>
+            <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{confirmModalMessage}</p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '6px' }}>
+              <button 
+                className="btn" 
+                onClick={() => setShowConfirmModal(false)}
+                style={{ flex: 1, padding: '8px 16px', borderRadius: '10px', fontSize: '12px', fontWeight: 600 }}
+              >
+                Mégse
+              </button>
+              <button 
+                className="btn" 
+                onClick={() => {
+                  if (onConfirmAction) {
+                    onConfirmAction();
+                  }
+                  setShowConfirmModal(false);
+                }}
+                style={{ 
+                  flex: 1, 
+                  padding: '8px 16px', 
+                  background: '#ff453a', 
+                  color: 'white', 
+                  border: '1px solid rgba(255,69,58,0.3)', 
+                  borderRadius: '10px', 
+                  fontSize: '12px', 
+                  fontWeight: 600,
+                  boxShadow: '0 0 10px rgba(255,69,58,0.2)'
+                }}
+              >
+                {confirmButtonText}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ================= MODAL: KEDVEZMÉNY ================= */}
       {showDiscountModal && (
