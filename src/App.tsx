@@ -1111,6 +1111,30 @@ export default function App() {
   const [openPromoPackDropdown, setOpenPromoPackDropdown] = useState(false);
 
   const [editingItemTab, setEditingItemTab] = useState<'general' | 'promo' | 'ingredients'>('general');
+  const [editingCategoryTab, setEditingCategoryTab] = useState<'general' | 'promo' | 'menu_mode'>('general');
+  const catModalContentRef = useRef<HTMLDivElement>(null);
+  const [catModalHeight, setCatModalHeight] = useState<number>(350);
+
+  useEffect(() => {
+    if (!editingCategory || !catModalContentRef.current) return;
+    const updateHeight = () => {
+      if (catModalContentRef.current) {
+        setCatModalHeight(catModalContentRef.current.scrollHeight);
+      }
+    };
+    
+    const resizeObserver = new ResizeObserver(() => {
+      updateHeight();
+    });
+    resizeObserver.observe(catModalContentRef.current);
+    
+    const timer = setTimeout(updateHeight, 80);
+    
+    return () => {
+      resizeObserver.disconnect();
+      clearTimeout(timer);
+    };
+  }, [editingCategory, editingCategoryTab, promoIsEnabled, newCatIsMenuCategory, newCatCourses, newCatScheduleDays]);
   const tabContentRef = useRef<HTMLDivElement>(null);
   const [tabHeight, setTabHeight] = useState<number>(300);
 
@@ -5277,6 +5301,7 @@ export default function App() {
                             }}
                             onClick={() => {
                               setEditingCategory({ id: 0, name: '', description: '', is_active: true });
+                              setEditingCategoryTab('general');
                               setNewCatName('');
                               setNewCatDescription('');
                               setNewCatLinkedCategoryId('none');
@@ -5959,255 +5984,149 @@ export default function App() {
                   {/* Add / Edit Category Modal Overlay */}
                   {editingCategory && (
                     <div className="modal-overlay" onClick={() => setEditingCategory(null)}>
-                      <div className="modal-card" style={{ maxWidth: newCatIsMenuCategory ? '950px' : '480px', width: '95%', maxHeight: '90vh', background: 'var(--panel-bg)', border: '1px solid var(--glass-border)', padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', transition: 'max-width 0.25s ease' }} onClick={e => e.stopPropagation()}>
-                        <div className="modal-header" style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span className="modal-title" style={{ fontSize: '15px', fontWeight: 700 }}>
-                            {editingCategory.id === 0 ? 'Új kategória hozzáadása' : 'Kategória szerkesztése'}
+                      <div className="modal-card" style={{
+                        maxWidth: '950px',
+                        width: '95%',
+                        height: `${catModalHeight + (editingCategoryTab === 'general' ? 270 : 320)}px`,
+                        maxHeight: '95vh',
+                        background: 'var(--panel-bg)',
+                        border: '1px solid var(--glass-border)',
+                        padding: '24px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '20px',
+                        transition: 'height 0.35s cubic-bezier(0.25, 1, 0.5, 1)',
+                        overflow: 'hidden'
+                      }} onClick={e => e.stopPropagation()}>
+                        
+                        <div className="modal-header" style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span className="modal-title" style={{ fontSize: '18px', fontWeight: 700, color: 'white' }}>
+                            {editingCategory.id === 0 ? 'Új Kategória hozzáadása' : 'Kategória szerkesztése'}
                           </span>
-                          <button className="island-close-btn" style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }} onClick={() => setEditingCategory(null)}>
-                            <X size={16} />
+                          <button className="island-close-btn" style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', transition: 'background-color 0.2s' }} onClick={() => setEditingCategory(null)}>
+                            <X size={18} />
                           </button>
                         </div>
 
-                        {/* Modal Scrollable Body */}
+                        {/* Tab Selector Navbar */}
                         <div style={{
-                          display: 'grid',
-                          gridTemplateColumns: newCatIsMenuCategory ? '1.2fr 1.8fr' : '1fr',
-                          gap: '20px',
+                          display: 'flex',
+                          background: 'rgba(255, 255, 255, 0.04)',
+                          borderRadius: '10px',
+                          padding: '4px',
+                          border: '1px solid rgba(255,255,255,0.06)'
+                        }}>
+                          {[
+                            { id: 'general', label: 'Általános', icon: <Info size={14} /> },
+                            { id: 'promo', label: 'Időzítés', icon: <Clock size={14} /> },
+                            { id: 'menu_mode', label: 'Menü mód', icon: <Layers size={14} /> }
+                          ].map(tab => {
+                            const isActive = editingCategoryTab === tab.id;
+                            return (
+                              <button
+                                key={tab.id}
+                                type="button"
+                                onClick={() => setEditingCategoryTab(tab.id as any)}
+                                style={{
+                                  flex: 1,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '8px',
+                                  padding: '10px 16px',
+                                  borderRadius: '8px',
+                                  border: 'none',
+                                  background: isActive ? '#0a84ff' : 'transparent',
+                                  color: 'white',
+                                  fontSize: '13px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s cubic-bezier(0.25, 1, 0.5, 1)',
+                                  boxShadow: isActive ? '0 2px 8px rgba(10,132,255,0.4)' : 'none'
+                                }}
+                              >
+                                {tab.icon}
+                                {tab.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Context Header */}
+                        {editingCategoryTab !== 'general' && (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            background: 'rgba(10,132,255,0.08)',
+                            border: '1px solid rgba(10,132,255,0.15)',
+                            borderRadius: '8px',
+                            padding: '10px 16px',
+                            fontSize: '13px',
+                            color: 'white'
+                          }}>
+                            <span style={{ fontWeight: 600, color: '#0a84ff' }}>📍 Szerkesztett kategória:</span>
+                            <span style={{ fontWeight: 700 }}>{newCatName || 'Névtelen kategória'}</span>
+                          </div>
+                        )}
+
+                        {/* Modal Body */}
+                        <div style={{
                           flex: 1,
                           minHeight: 0,
-                          overflowY: 'hidden',
-                          transition: 'grid-template-columns 0.25s ease'
+                          overflowY: 'auto',
+                          paddingRight: '4px'
                         }}>
-                          {/* Column 1: General Info, Schedule & Promotions */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', paddingRight: newCatIsMenuCategory ? '10px' : '0' }}>
-                            <div>
-                              <label className="input-label">Kategória név</label>
-                              <input 
-                                type="text" 
-                                className="input-field" 
-                                value={newCatName}
-                                onChange={e => setNewCatName(e.target.value)}
-                                placeholder="pl: Levesek, Italok"
-                              />
-                            </div>
-                            <div>
-                              <label className="input-label">Leírás</label>
-                              <input 
-                                type="text" 
-                                className="input-field" 
-                                value={newCatDescription}
-                                onChange={e => setNewCatDescription(e.target.value)}
-                                placeholder="pl: Finom meleg leveseink..."
-                              />
-                            </div>
-
-                            {/* CATEGORY TYPE: NORMAL VS MENU */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '4px 0' }}>
-                              <label className="input-label" style={{ margin: 0 }}>Menüs Kategória?</label>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', userSelect: 'none' }}>
-                                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                                  {newCatIsMenuCategory ? 'Igen (Menü)' : 'Nem (Sima)'}
-                                </span>
-                                <div 
-                                  onClick={() => {
-                                    if (newCatLinkedCategoryId !== 'none') {
-                                      alert('Csatolt kategóriával rendelkező kategória nem lehet Menüs kategória! Távolítsd el a csatolt kategóriát először.');
-                                      return;
-                                    }
-                                    setNewCatIsMenuCategory(!newCatIsMenuCategory);
-                                  }}
-                                  style={{
-                                    width: '36px',
-                                    height: '20px',
-                                    borderRadius: '10px',
-                                    background: newCatIsMenuCategory ? '#30d158' : '#ff453a',
-                                    position: 'relative',
-                                    cursor: 'pointer',
-                                    transition: 'background-color 0.2s ease',
-                                    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)'
-                                  }}
-                                >
-                                  <div 
-                                    style={{
-                                      width: '16px',
-                                      height: '16px',
-                                      borderRadius: '50%',
-                                      background: 'white',
-                                      position: 'absolute',
-                                      top: '2px',
-                                      left: newCatIsMenuCategory ? '18px' : '2px',
-                                      transition: 'left 0.2s ease',
-                                      boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
-                                    }}
-                                  />
-                                </div>
+                          
+                          {/* TAB 1: GENERAL */}
+                          {editingCategoryTab === 'general' && (
+                            <div ref={catModalContentRef} style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '10px 0' }}>
+                              <div>
+                                <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block' }}>Kategória Név</label>
+                                <input 
+                                  type="text" 
+                                  className="input-field" 
+                                  style={{ height: '46px', fontSize: '15px', padding: '0 16px', borderRadius: '8px' }}
+                                  value={newCatName} 
+                                  onChange={e => setNewCatName(e.target.value)} 
+                                  placeholder="pl: Pizzák, Tészták, Desszertek"
+                                />
                               </div>
-                            </div>
 
-                            {!newCatIsMenuCategory && (
-                              <>
-                                <div>
-                                  <label className="input-label">Csatolt Kategória (opcionális)</label>
-                                  <AppleSelect
-                                    value={newCatLinkedCategoryId}
-                                    onChange={val => setNewCatLinkedCategoryId(val === 'none' ? 'none' : Number(val))}
-                                    options={[
-                                      { value: 'none', label: 'Nincs csatolt kategória' },
-                                      ...db.categories
-                                        .filter((c: any) => c.id !== editingCategory.id)
-                                        .map((c: any) => ({ value: c.id, label: c.name }))
-                                    ]}
-                                    icon={<Layers size={12} />}
-                                    isOpen={openCatLinkDropdown}
-                                    onToggle={() => setOpenCatLinkDropdown(!openCatLinkDropdown)}
-                                    onClose={() => setOpenCatLinkDropdown(false)}
-                                    openUpward={true}
-                                  />
-                                </div>
-
-                                {newCatLinkedCategoryId !== 'none' && (
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
-                                    <input 
-                                      type="checkbox" 
-                                      id="newCatIncludeLinkedPackagingFee"
-                                      checked={newCatIncludeLinkedPackagingFee}
-                                      onChange={e => setNewCatIncludeLinkedPackagingFee(e.target.checked)}
-                                      style={{
-                                        width: '18px',
-                                        height: '18px',
-                                        accentColor: '#bf5af2',
-                                        cursor: 'pointer'
-                                      }}
-                                    />
-                                    <label 
-                                      htmlFor="newCatIncludeLinkedPackagingFee" 
-                                      style={{ fontSize: '12px', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}
-                                    >
-                                      Csatolt csomagolási díj felszámítása
-                                    </label>
-                                  </div>
-                                )}
-                              </>
-                            )}
-
-                            {newCatIsMenuCategory && (
-                              /* MENU AVAILABILITY SCHEDULE */
-                              <div style={{
-                                border: '1px solid rgba(255,255,255,0.08)',
-                                borderRadius: '10px',
-                                padding: '12px',
-                                background: 'rgba(255,255,255,0.01)',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '10px'
-                              }}>
-                                <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)' }}>
-                                  Menü Elérhetőségi Ideje
-                                </span>
-
-                                <div>
-                                  <label className="input-label" style={{ fontSize: '11px', marginBottom: '6px' }}>Napok</label>
-                                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                    {[
-                                      { val: 1, label: 'H' },
-                                      { val: 2, label: 'K' },
-                                      { val: 3, label: 'Sze' },
-                                      { val: 4, label: 'Cs' },
-                                      { val: 5, label: 'P' },
-                                      { val: 6, label: 'Szo' },
-                                      { val: 7, label: 'V' }
-                                    ].map(day => {
-                                      const isSelected = newCatScheduleDays.includes(day.val);
-                                      return (
-                                        <button
-                                          key={day.val}
-                                          type="button"
-                                          onClick={() => {
-                                            if (isSelected) {
-                                              setNewCatScheduleDays(newCatScheduleDays.filter(d => d !== day.val));
-                                            } else {
-                                              setNewCatScheduleDays([...newCatScheduleDays, day.val].sort());
-                                            }
-                                          }}
-                                          style={{
-                                            width: '30px',
-                                            height: '30px',
-                                            borderRadius: '6px',
-                                            border: '1px solid rgba(255,255,255,0.08)',
-                                            background: isSelected ? 'var(--primary)' : 'rgba(0,0,0,0.2)',
-                                            color: 'white',
-                                            fontSize: '11px',
-                                            fontWeight: 600,
-                                            cursor: 'pointer',
-                                            transition: 'all 0.15s ease'
-                                          }}
-                                        >
-                                          {day.label}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                  <div>
-                                    <label className="input-label" style={{ fontSize: '11px' }}>Ettől</label>
-                                    <input 
-                                      type="time" 
-                                      className="input-field" 
-                                      style={{ height: '32px', fontSize: '12px' }}
-                                      value={newCatScheduleFrom}
-                                      onChange={e => setNewCatScheduleFrom(e.target.value)}
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="input-label" style={{ fontSize: '11px' }}>Eddig</label>
-                                    <input 
-                                      type="time" 
-                                      className="input-field" 
-                                      style={{ height: '32px', fontSize: '12px' }}
-                                      value={newCatScheduleTo}
-                                      onChange={e => setNewCatScheduleTo(e.target.value)}
-                                    />
-                                  </div>
-                                </div>
+                              <div>
+                                <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block' }}>Leírás</label>
+                                <input 
+                                  type="text" 
+                                  className="input-field" 
+                                  style={{ height: '46px', fontSize: '15px', padding: '0 16px', borderRadius: '8px' }}
+                                  value={newCatDescription} 
+                                  onChange={e => setNewCatDescription(e.target.value)} 
+                                  placeholder="pl: Kemencében sült pizzáink..."
+                                />
                               </div>
-                            )}
 
-                            {/* TIMED PROMOTION CONFIGURATION CARD */}
-                            <div ref={promoPanelRef} style={{
-                              border: '1px solid rgba(255,255,255,0.08)',
-                              borderRadius: '10px',
-                              padding: '14px',
-                              background: 'rgba(255,255,255,0.02)',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '12px'
-                            }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--primary)' }}>
-                                  Időzített Árazás & Akciók
-                                </span>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', userSelect: 'none' }}>
-                                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                                    {promoIsEnabled ? 'Engedélyezve' : 'Kitiltva'}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'white' }}>Menüs kategóriává alakítás?</span>
+                                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Kapcsold be, ha ebben a kategóriában menüket (több fogásos választékot) akarsz értékesíteni.</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', userSelect: 'none' }}>
+                                  <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                    {newCatIsMenuCategory ? 'Igen (Menü)' : 'Nem (Sima)'}
                                   </span>
                                   <div 
                                     onClick={() => {
-                                      const nextVal = !promoIsEnabled;
-                                      setPromoIsEnabled(nextVal);
-                                      if (nextVal) {
-                                        setTimeout(() => {
-                                          promoPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                                        }, 80);
+                                      if (newCatLinkedCategoryId !== 'none') {
+                                        alert('Csatolt kategóriával rendelkező kategória nem lehet Menüs kategória! Távolítsd el a csatolt kategóriát először.');
+                                        return;
                                       }
+                                      setNewCatIsMenuCategory(!newCatIsMenuCategory);
                                     }}
                                     style={{
-                                      width: '36px',
-                                      height: '20px',
-                                      borderRadius: '10px',
-                                      background: promoIsEnabled ? '#30d158' : '#ff453a',
+                                      width: '44px',
+                                      height: '24px',
+                                      borderRadius: '12px',
+                                      background: newCatIsMenuCategory ? '#30d158' : 'rgba(255,255,255,0.15)',
                                       position: 'relative',
                                       cursor: 'pointer',
                                       transition: 'background-color 0.2s ease',
@@ -6216,13 +6135,13 @@ export default function App() {
                                   >
                                     <div 
                                       style={{
-                                        width: '16px',
-                                        height: '16px',
+                                        width: '20px',
+                                        height: '20px',
                                         borderRadius: '50%',
                                         background: 'white',
                                         position: 'absolute',
                                         top: '2px',
-                                        left: promoIsEnabled ? '18px' : '2px',
+                                        left: newCatIsMenuCategory ? '22px' : '2px',
                                         transition: 'left 0.2s ease',
                                         boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
                                       }}
@@ -6231,421 +6150,634 @@ export default function App() {
                                 </div>
                               </div>
 
-                              {promoIsEnabled && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px dashed rgba(255,255,255,0.06)', paddingTop: '10px' }}>
-                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                    <div>
-                                      <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Típus</label>
-                                      <AppleSelect
-                                        value={promoType}
-                                        onChange={val => setPromoType(val as 'once' | 'recurring')}
-                                        options={[
-                                          { value: 'once', label: 'Egy alkalommal' },
-                                          { value: 'recurring', label: 'Ismétlődő' }
-                                        ]}
-                                        icon={<Activity size={12} />}
-                                        isOpen={openPromoTypeDropdown}
-                                        onToggle={() => setOpenPromoTypeDropdown(!openPromoTypeDropdown)}
-                                        onClose={() => setOpenPromoTypeDropdown(false)}
-                                      />
-                                    </div>
-
-                                    {promoType === 'once' ? (
-                                      <div>
-                                        <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Dátum</label>
-                                        <input 
-                                          type="date"
-                                          className="input-field"
-                                          style={{ height: '32px', fontSize: '12px' }}
-                                          value={promoOnceDate}
-                                          onChange={e => setPromoOnceDate(e.target.value)}
-                                        />
-                                      </div>
-                                    ) : (
-                                      <div>
-                                        <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Gyakoriság</label>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                          <input 
-                                            type="number"
-                                            className="input-field"
-                                            style={{ height: '32px', fontSize: '12px', width: '60px' }}
-                                            min={1}
-                                            value={promoRecurringWeeksInterval}
-                                            onChange={e => setPromoRecurringWeeksInterval(Math.max(1, parseInt(e.target.value) || 1))}
-                                          />
-                                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>hetenként</span>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  {promoType === 'recurring' && (
-                                    <>
-                                      <div>
-                                        <label className="input-label" style={{ fontSize: '11px', marginBottom: '6px' }}>Napok</label>
-                                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                          {[
-                                            { val: 1, label: 'H' },
-                                            { val: 2, label: 'K' },
-                                            { val: 3, label: 'Sze' },
-                                            { val: 4, label: 'Cs' },
-                                            { val: 5, label: 'P' },
-                                            { val: 6, label: 'Szo' },
-                                            { val: 7, label: 'V' }
-                                          ].map(day => {
-                                            const isSelected = promoRecurringDays.includes(day.val);
-                                            return (
-                                              <button
-                                                key={day.val}
-                                                type="button"
-                                                onClick={() => {
-                                                  if (isSelected) {
-                                                    setPromoRecurringDays(promoRecurringDays.filter(d => d !== day.val));
-                                                  } else {
-                                                    setPromoRecurringDays([...promoRecurringDays, day.val].sort());
-                                                  }
-                                                }}
-                                                style={{
-                                                  width: '30px',
-                                                  height: '30px',
-                                                  borderRadius: '6px',
-                                                  border: '1px solid rgba(255,255,255,0.08)',
-                                                  background: isSelected ? 'var(--primary)' : 'rgba(0,0,0,0.2)',
-                                                  color: 'white',
-                                                  fontSize: '11px',
-                                                  fontWeight: 600,
-                                                  cursor: 'pointer',
-                                                  transition: 'all 0.15s ease'
-                                                }}
-                                              >
-                                                {day.label}
-                                              </button>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-
-                                      {promoRecurringWeeksInterval > 1 && (
-                                        <div>
-                                          <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Kezdő dátum (hét számoláshoz)</label>
-                                          <input 
-                                            type="date"
-                                            className="input-field"
-                                            style={{ height: '32px', fontSize: '12px' }}
-                                            value={promoRecurringStartDate}
-                                            onChange={e => setPromoRecurringStartDate(e.target.value)}
-                                          />
-                                        </div>
-                                      )}
-                                    </>
-                                  )}
-
-                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                    <div>
-                                      <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Típus</label>
-                                      <input 
-                                        type="text"
-                                        className="input-field"
-                                        style={{ height: '32px', fontSize: '12px', background: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)' }}
-                                        value="Százalékos"
-                                        disabled
-                                      />
-                                    </div>
-
-                                    <div>
-                                      <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Módosítás (%)</label>
-                                      <input 
-                                        type="number"
-                                        className="input-field"
-                                        style={{ height: '32px', fontSize: '12px' }}
-                                        value={promoPriceAdjustmentValue}
-                                        onChange={e => setPromoPriceAdjustmentValue(parseInt(e.target.value) || 0)}
-                                        placeholder="pl: -10 vagy +15"
-                                      />
-                                    </div>
-                                  </div>
-
+                              {!newCatIsMenuCategory && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                   <div>
-                                    <label className="input-label" style={{ fontSize: '11px', marginBottom: '2px' }}>Csomagolási díj kezelése</label>
+                                    <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block' }}>Csatolt Kategória (opcionális)</label>
                                     <AppleSelect
-                                      value={promoPackagingFeePolicy}
-                                      onChange={val => setPromoPackagingFeePolicy(val as 'standard' | 'free' | 'discounted')}
+                                      value={newCatLinkedCategoryId}
+                                      onChange={val => setNewCatLinkedCategoryId(val === 'none' ? 'none' : Number(val))}
                                       options={[
-                                        { value: 'standard', label: 'Rendes árán marad' },
-                                        { value: 'free', label: 'Ingyenes csomagolás' },
-                                        { value: 'discounted', label: 'Ugyanaz a % kedvezmény jöjjön le' }
+                                        { value: 'none', label: 'Nincs csatolt kategória' },
+                                        ...db.categories
+                                          .filter((c: any) => c.id !== editingCategory.id)
+                                          .map((c: any) => ({ value: c.id, label: c.name }))
                                       ]}
-                                      icon={<Package size={12} />}
-                                      isOpen={openPromoPackDropdown}
-                                      onToggle={() => setOpenPromoPackDropdown(!openPromoPackDropdown)}
-                                      onClose={() => setOpenPromoPackDropdown(false)}
+                                      icon={<Layers size={14} />}
+                                      isOpen={openCatLinkDropdown}
+                                      onToggle={() => setOpenCatLinkDropdown(!openCatLinkDropdown)}
+                                      onClose={() => setOpenCatLinkDropdown(false)}
                                       openUpward={true}
                                     />
                                   </div>
+
+                                  {newCatLinkedCategoryId !== 'none' && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 0' }}>
+                                      <input 
+                                        type="checkbox" 
+                                        id="newCatIncludeLinkedPackagingFee"
+                                        checked={newCatIncludeLinkedPackagingFee}
+                                        onChange={e => setNewCatIncludeLinkedPackagingFee(e.target.checked)}
+                                        style={{
+                                          width: '20px',
+                                          height: '20px',
+                                          accentColor: '#0a84ff',
+                                          cursor: 'pointer'
+                                        }}
+                                      />
+                                      <label 
+                                        htmlFor="newCatIncludeLinkedPackagingFee" 
+                                        style={{ fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}
+                                      >
+                                        Csatolt csomagolási díj felszámítása
+                                      </label>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
-                          </div>
+                          )}
 
-                          {/* Column 2: Courses Configuration (only visible if newCatIsMenuCategory) */}
-                          {newCatIsMenuCategory && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', paddingLeft: '10px', borderLeft: '1px solid rgba(255,255,255,0.06)' }}>
-                              {/* COURSES EDITOR PANEL */}
+                          {/* TAB 2: PROMOTION / TIMING */}
+                          {editingCategoryTab === 'promo' && (
+                            <div ref={catModalContentRef} style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '10px 0' }}>
                               <div style={{
                                 border: '1px solid rgba(255,255,255,0.08)',
-                                borderRadius: '10px',
-                                padding: '12px',
-                                background: 'rgba(255,255,255,0.01)',
+                                borderRadius: '12px',
+                                padding: '16px 20px',
+                                background: 'rgba(255,255,255,0.02)',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 gap: '12px'
                               }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--primary)' }}>
-                                    Fogások Konfigurációja
+                                  <span style={{ fontSize: '15px', fontWeight: 700, color: '#0a84ff' }}>
+                                    Időzített Árazás & Akciók Beállítása
                                   </span>
-                                  <button
-                                    type="button"
-                                    className="btn"
-                                    style={{ padding: '4px 10px', fontSize: '11px', background: 'var(--primary)', color: 'white' }}
-                                    onClick={() => {
-                                      const nextId = newCatCourses.length > 0 ? Math.max(...newCatCourses.map(c => c.id)) + 1 : 1;
-                                      setNewCatCourses([...newCatCourses, {
-                                        id: nextId,
-                                        name: `${newCatCourses.length + 1}. Fogás`,
-                                        sourceType: 'individual',
-                                        itemIds: [],
-                                        itemOverrides: {}
-                                      }]);
-                                    }}
-                                  >
-                                    + Új Fogás
-                                  </button>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', userSelect: 'none' }}>
+                                    <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                      {promoIsEnabled ? 'Aktív' : 'Deaktív'}
+                                    </span>
+                                    <div 
+                                      onClick={() => {
+                                        const nextVal = !promoIsEnabled;
+                                        setPromoIsEnabled(nextVal);
+                                      }}
+                                      style={{
+                                        width: '44px',
+                                        height: '24px',
+                                        borderRadius: '12px',
+                                        background: promoIsEnabled ? '#30d158' : 'rgba(255,255,255,0.15)',
+                                        position: 'relative',
+                                        cursor: 'pointer',
+                                        transition: 'background-color 0.2s ease',
+                                        boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.4)'
+                                      }}
+                                    >
+                                      <div 
+                                        style={{
+                                          width: '20px',
+                                          height: '20px',
+                                          borderRadius: '50%',
+                                          background: 'white',
+                                          position: 'absolute',
+                                          top: '2px',
+                                          left: promoIsEnabled ? '22px' : '2px',
+                                          transition: 'left 0.2s ease',
+                                          boxShadow: '0 1px 3px rgba(0,0,0,0.4)'
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
                                 </div>
 
-                                {newCatCourses.length === 0 ? (
-                                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center', padding: '10px 0' }}>
-                                    Még nincsenek fogások hozzáadva.
-                                  </div>
-                                ) : (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '450px', overflowY: 'auto' }}>
-                                    {newCatCourses.map((course) => {
-                                      let courseItems: MenuItem[] = [];
-                                      if (course.sourceType === 'category' && course.sourceCategoryId) {
-                                        courseItems = db.items.filter((i: any) => i.category_id === course.sourceCategoryId && i.is_active !== false);
-                                      } else if (course.sourceType === 'individual' && course.itemIds) {
-                                        courseItems = db.items.filter((i: any) => course.itemIds?.includes(i.id) && i.is_active !== false);
-                                      }
+                                {promoIsEnabled ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px dashed rgba(255,255,255,0.08)', paddingTop: '12px' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                      <div>
+                                        <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px', display: 'block' }}>Típus</label>
+                                        <AppleSelect
+                                          value={promoType}
+                                          onChange={val => setPromoType(val as 'once' | 'recurring')}
+                                          options={[
+                                            { value: 'once', label: 'Egy alkalommal' },
+                                            { value: 'recurring', label: 'Ismétlődő' }
+                                          ]}
+                                          icon={<Activity size={14} />}
+                                          isOpen={openPromoTypeDropdown}
+                                          onToggle={() => setOpenPromoTypeDropdown(!openPromoTypeDropdown)}
+                                          onClose={() => setOpenPromoTypeDropdown(false)}
+                                        />
+                                      </div>
 
-                                      return (
-                                        <div key={course.id} style={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '10px', background: 'rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      {promoType === 'once' ? (
+                                        <div>
+                                          <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px', display: 'block' }}>Dátum</label>
+                                          <input 
+                                            type="date"
+                                            className="input-field"
+                                            style={{ height: '42px', fontSize: '14px', padding: '0 12px', borderRadius: '8px' }}
+                                            value={promoOnceDate}
+                                            onChange={e => setPromoOnceDate(e.target.value)}
+                                          />
+                                        </div>
+                                      ) : (
+                                        <div>
+                                          <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px', display: 'block' }}>Gyakoriság</label>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                             <input 
-                                              type="text"
+                                              type="number"
                                               className="input-field"
-                                              style={{ height: '28px', width: '60%', fontSize: '12px', fontWeight: 'bold' }}
-                                              value={course.name}
-                                              onChange={e => {
-                                                const val = e.target.value;
-                                                setNewCatCourses(newCatCourses.map(c => c.id === course.id ? { ...c, name: val } : c));
-                                              }}
+                                              style={{ height: '42px', fontSize: '14px', width: '80px', padding: '0 12px', borderRadius: '8px' }}
+                                              min={1}
+                                              value={promoRecurringWeeksInterval}
+                                              onChange={e => setPromoRecurringWeeksInterval(Math.max(1, parseInt(e.target.value) || 1))}
                                             />
-                                            <button
-                                              type="button"
-                                              className="btn btn-danger"
-                                              style={{ padding: '3px 8px', fontSize: '10px' }}
-                                              onClick={() => {
-                                                setNewCatCourses(newCatCourses.filter(c => c.id !== course.id));
-                                              }}
-                                            >
-                                              Töröl
-                                            </button>
+                                            <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>hetenként</span>
                                           </div>
+                                        </div>
+                                      )}
+                                    </div>
 
-                                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                                            <div>
-                                              <label style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Forrás típusa</label>
-                                              <select
-                                                className="input-field"
-                                                style={{ height: '28px', fontSize: '11px', padding: '0 4px', background: 'rgba(0,0,0,0.4)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px' }}
-                                                value={course.sourceType}
-                                                onChange={e => {
-                                                  const type = e.target.value as 'category' | 'individual';
-                                                  setNewCatCourses(newCatCourses.map(c => c.id === course.id ? { ...c, sourceType: type, sourceCategoryId: null, itemIds: [], itemOverrides: {} } : c));
-                                                }}
-                                              >
-                                                <option value="individual">Egyedi ételek</option>
-                                                <option value="category">Teljes kategória</option>
-                                              </select>
-                                            </div>
-
-                                            {course.sourceType === 'category' ? (
-                                              <div>
-                                                <label style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Kategória</label>
-                                                <select
-                                                  className="input-field"
-                                                  style={{ height: '28px', fontSize: '11px', padding: '0 4px', background: 'rgba(0,0,0,0.4)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px' }}
-                                                  value={course.sourceCategoryId || ''}
-                                                  onChange={e => {
-                                                    const catId = Number(e.target.value) || null;
-                                                    setNewCatCourses(newCatCourses.map(c => c.id === course.id ? { ...c, sourceCategoryId: catId, itemOverrides: {} } : c));
+                                    {promoType === 'recurring' && (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                        <div>
+                                          <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px', display: 'block' }}>Ismétlődés napjai</label>
+                                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                            {[
+                                              { val: 1, label: 'Hétfő' },
+                                              { val: 2, label: 'Kedd' },
+                                              { val: 3, label: 'Szerda' },
+                                              { val: 4, label: 'Csütörtök' },
+                                              { val: 5, label: 'Péntek' },
+                                              { val: 6, label: 'Szombat' },
+                                              { val: 7, label: 'Vasárnap' }
+                                            ].map(day => {
+                                              const isSelected = promoRecurringDays.includes(day.val);
+                                              return (
+                                                <button
+                                                  key={day.val}
+                                                  type="button"
+                                                  onClick={() => {
+                                                    if (isSelected) {
+                                                      setPromoRecurringDays(promoRecurringDays.filter(d => d !== day.val));
+                                                    } else {
+                                                      setPromoRecurringDays([...promoRecurringDays, day.val].sort());
+                                                    }
+                                                  }}
+                                                  style={{
+                                                    padding: '8px 14px',
+                                                    borderRadius: '8px',
+                                                    border: '1px solid rgba(255,255,255,0.08)',
+                                                    background: isSelected ? '#0a84ff' : 'rgba(0,0,0,0.2)',
+                                                    color: 'white',
+                                                    fontSize: '13px',
+                                                    fontWeight: 600,
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.15s ease'
                                                   }}
                                                 >
-                                                  <option value="">-- Válassz --</option>
-                                                  {db.categories.filter((c: any) => c.id !== editingCategory.id && !c.is_menu_category).map((c: any) => (
-                                                    <option key={c.id} value={c.id}>{c.name}</option>
-                                                  ))}
-                                                </select>
-                                              </div>
-                                            ) : (
-                                              <div>
-                                                <label style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Ételek</label>
-                                                <div style={{ maxHeight: '80px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.08)', padding: '4px', borderRadius: '4px', background: 'rgba(0,0,0,0.3)' }}>
-                                                  {db.items.map((item: any) => {
-                                                    const isChecked = course.itemIds?.includes(item.id);
-                                                    return (
-                                                      <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', cursor: 'pointer', color: 'white', margin: '2px 0' }}>
-                                                        <input 
-                                                          type="checkbox"
-                                                          checked={isChecked}
-                                                          onChange={() => {
-                                                            const updatedIds = isChecked 
-                                                              ? (course.itemIds || []).filter(id => id !== item.id)
-                                                              : [...(course.itemIds || []), item.id];
-                                                            
-                                                            const updatedOverrides = { ...(course.itemOverrides || {}) };
-                                                            if (isChecked) {
-                                                              delete updatedOverrides[item.id];
-                                                            }
-
-                                                            setNewCatCourses(newCatCourses.map(c => c.id === course.id ? { ...c, itemIds: updatedIds, itemOverrides: updatedOverrides } : c));
-                                                          }}
-                                                        />
-                                                        {item.name}
-                                                      </label>
-                                                    );
-                                                  })}
-                                                </div>
-                                              </div>
-                                            )}
+                                                  {day.label}
+                                                </button>
+                                              );
+                                            })}
                                           </div>
-
-                                          {courseItems.length > 0 && (
-                                            <div style={{ marginTop: '4px', borderTop: '1px dashed rgba(255,255,255,0.06)', paddingTop: '6px' }}>
-                                              <span style={{ fontSize: '10px', fontWeight: 'bold', color: 'var(--primary)' }}>
-                                                Ételek felülírásai:
-                                              </span>
-                                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '4px' }}>
-                                                {courseItems.map((item) => {
-                                                  const override = course.itemOverrides?.[item.id] || { price: item.price, ingredients: item.ingredients || [] };
-                                                  
-                                                  return (
-                                                    <div key={item.id} style={{ padding: '6px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '4px' }}>
-                                                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                        <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'white' }}>{item.name}</span>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                          <label style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Ár:</label>
-                                                          <input 
-                                                            type="number"
-                                                            className="input-field"
-                                                            style={{ height: '24px', width: '60px', fontSize: '11px' }}
-                                                            value={override.price}
-                                                            onChange={e => {
-                                                              const price = parseInt(e.target.value) || 0;
-                                                              const updatedOverrides = {
-                                                                ...(course.itemOverrides || {}),
-                                                                [item.id]: {
-                                                                  ...override,
-                                                                  price
-                                                                }
-                                                              };
-                                                              setNewCatCourses(newCatCourses.map(c => c.id === course.id ? { ...c, itemOverrides: updatedOverrides } : c));
-                                                            }}
-                                                          />
-                                                        </div>
-                                                      </div>
-
-                                                      {override.ingredients && override.ingredients.length > 0 && (
-                                                        <div style={{ marginTop: '4px', paddingLeft: '8px', borderLeft: '1px solid rgba(255,255,255,0.1)' }}>
-                                                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
-                                                            {override.ingredients.map((ing, ingIdx) => {
-                                                              const inv = db.inventory.find((i: any) => i.id === ing.ingredientId);
-                                                              return (
-                                                                <div key={ing.ingredientId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
-                                                                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                                                                    {inv ? inv.name : `Alapanyag #${ing.ingredientId}`}
-                                                                  </span>
-                                                                  <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                                                                    <input 
-                                                                      type="number"
-                                                                      className="input-field"
-                                                                      style={{ height: '20px', width: '45px', fontSize: '10px', padding: '2px' }}
-                                                                      step="any"
-                                                                      value={ing.quantity}
-                                                                      onChange={e => {
-                                                                        const qty = parseFloat(e.target.value) || 0;
-                                                                        const updatedIngs = override.ingredients.map((ig, igx) => igx === ingIdx ? { ...ig, quantity: qty } : ig);
-                                                                        const updatedOverrides = {
-                                                                          ...(course.itemOverrides || {}),
-                                                                          [item.id]: {
-                                                                            ...override,
-                                                                            ingredients: updatedIngs
-                                                                          }
-                                                                        };
-                                                                        setNewCatCourses(newCatCourses.map(c => c.id === course.id ? { ...c, itemOverrides: updatedOverrides } : c));
-                                                                      }}
-                                                                    />
-                                                                    <span style={{ fontSize: '9px', color: 'var(--text-muted)' }}>{inv?.unit || ''}</span>
-                                                                  </div>
-                                                                </div>
-                                                              );
-                                                            })}
-                                                          </div>
-                                                        </div>
-                                                      )}
-                                                    </div>
-                                                  );
-                                                })}
-                                              </div>
-                                            </div>
-                                          )}
                                         </div>
-                                      );
-                                    })}
+
+                                        {promoRecurringWeeksInterval > 1 && (
+                                          <div>
+                                            <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px', display: 'block' }}>Kezdő dátum (referencia hét)</label>
+                                            <input 
+                                              type="date"
+                                              className="input-field"
+                                              style={{ height: '42px', fontSize: '14px', padding: '0 12px', borderRadius: '8px' }}
+                                              value={promoRecurringStartDate}
+                                              onChange={e => setPromoRecurringStartDate(e.target.value)}
+                                            />
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                      <div>
+                                        <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px', display: 'block' }}>Módosítás típusa</label>
+                                        <input 
+                                          type="text" 
+                                          className="input-field" 
+                                          style={{ height: '42px', fontSize: '14px', padding: '0 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', color: 'var(--text-secondary)' }}
+                                          value="Százalékos kedvezmény (%)" 
+                                          readOnly
+                                        />
+                                      </div>
+
+                                      <div>
+                                        <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px', display: 'block' }}>
+                                          Kedvezmény mértéke (százalékban, pl: -10) (%)
+                                        </label>
+                                        <input 
+                                          type="number"
+                                          className="input-field"
+                                          style={{ height: '42px', fontSize: '14px', padding: '0 12px', borderRadius: '8px' }}
+                                          value={promoPriceAdjustmentValue}
+                                          onChange={e => setPromoPriceAdjustmentValue(parseInt(e.target.value) || 0)}
+                                          placeholder="pl: -10"
+                                        />
+                                      </div>
+                                    </div>
+
+                                    <div>
+                                      <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px', display: 'block' }}>Csomagolási díj kezelése akció alatt</label>
+                                      <AppleSelect
+                                        value={promoPackagingFeePolicy}
+                                        onChange={val => setPromoPackagingFeePolicy(val as 'standard' | 'free' | 'discounted')}
+                                        options={[
+                                          { value: 'standard', label: 'Rendes árán marad' },
+                                          { value: 'free', label: 'Ingyenes csomagolás az akciós napokon' },
+                                          { value: 'discounted', label: 'Ugyanaz a százalékos kedvezmény jöjjön le belőle' }
+                                        ]}
+                                        icon={<Package size={14} />}
+                                        isOpen={openPromoPackDropdown}
+                                        onToggle={() => setOpenPromoPackDropdown(!openPromoPackDropdown)}
+                                        onClose={() => setOpenPromoPackDropdown(false)}
+                                        openUpward={true}
+                                      />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-secondary)', border: '1px dashed rgba(255,255,255,0.06)', borderRadius: '8px' }}>
+                                    <span style={{ fontSize: '14px', fontStyle: 'italic' }}>Az időzített árazások nincsenek engedélyezve ehhez a kategóriához.</span>
                                   </div>
                                 )}
                               </div>
                             </div>
                           )}
+
+                          {/* TAB 3: MENU MODE */}
+                          {editingCategoryTab === 'menu_mode' && (
+                            <div ref={catModalContentRef} style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '10px 0' }}>
+                              {!newCatIsMenuCategory ? (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '180px', flexDirection: 'column', gap: '12px', color: 'var(--text-secondary)', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: '10px', padding: '24px' }}>
+                                  <span style={{ fontSize: '24px' }}>⚠️</span>
+                                  <span style={{ fontSize: '14px', textAlign: 'center', fontWeight: 600 }}>A Menü Mód beállításai nem elérhetőek.</span>
+                                  <span style={{ fontSize: '12px', textAlign: 'center', opacity: 0.6 }}>Lépj az Általános fülre, és kapcsold be a "Menüs Kategória" kapcsolót!</span>
+                                </div>
+                              ) : (
+                                <div style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: '1.2fr 1.8fr',
+                                  gap: '24px',
+                                  padding: '10px 0'
+                                }}>
+                                  {/* Column A: Schedule */}
+                                  <div style={{
+                                    border: '1px solid rgba(255,255,255,0.08)',
+                                    borderRadius: '12px',
+                                    padding: '20px',
+                                    background: 'rgba(255,255,255,0.02)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '14px'
+                                  }}>
+                                    <span style={{ fontSize: '14px', fontWeight: 700, color: '#0a84ff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                      <Clock size={16} /> Menü Elérhetőség
+                                    </span>
+                                    
+                                    <div>
+                                      <label className="input-label" style={{ fontSize: '12px', marginBottom: '6px', display: 'block' }}>Aktív napok</label>
+                                      <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                                        {[
+                                          { val: 1, label: 'H' },
+                                          { val: 2, label: 'K' },
+                                          { val: 3, label: 'Sze' },
+                                          { val: 4, label: 'Cs' },
+                                          { val: 5, label: 'P' },
+                                          { val: 6, label: 'Szo' },
+                                          { val: 7, label: 'V' }
+                                        ].map(day => {
+                                          const isSelected = newCatScheduleDays.includes(day.val);
+                                          return (
+                                            <button
+                                              key={day.val}
+                                              type="button"
+                                              onClick={() => {
+                                                if (isSelected) {
+                                                  setNewCatScheduleDays(newCatScheduleDays.filter(d => d !== day.val));
+                                                } else {
+                                                  setNewCatScheduleDays([...newCatScheduleDays, day.val].sort());
+                                                }
+                                              }}
+                                              style={{
+                                                width: '28px',
+                                                height: '28px',
+                                                borderRadius: '6px',
+                                                border: '1px solid rgba(255,255,255,0.08)',
+                                                background: isSelected ? '#0a84ff' : 'rgba(0,0,0,0.2)',
+                                                color: 'white',
+                                                fontSize: '11px',
+                                                fontWeight: 600,
+                                                cursor: 'pointer',
+                                                transition: 'all 0.15s ease'
+                                              }}
+                                            >
+                                              {day.label}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                      <div>
+                                        <label className="input-label" style={{ fontSize: '12px', marginBottom: '4px', display: 'block' }}>Kezdés</label>
+                                        <input 
+                                          type="time" 
+                                          className="input-field" 
+                                          style={{ height: '36px', fontSize: '13px' }}
+                                          value={newCatScheduleFrom}
+                                          onChange={e => setNewCatScheduleFrom(e.target.value)}
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="input-label" style={{ fontSize: '12px', marginBottom: '4px', display: 'block' }}>Vége</label>
+                                        <input 
+                                          type="time" 
+                                          className="input-field" 
+                                          style={{ height: '36px', fontSize: '13px' }}
+                                          value={newCatScheduleTo}
+                                          onChange={e => setNewCatScheduleTo(e.target.value)}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Column B: Courses Editor */}
+                                  <div style={{ 
+                                    background: 'rgba(255, 255, 255, 0.01)', 
+                                    border: '1px solid rgba(255, 255, 255, 0.05)', 
+                                    borderRadius: '12px', 
+                                    padding: '20px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    maxHeight: '450px'
+                                  }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                      <span style={{ fontSize: '14px', fontWeight: 700, color: '#30d158', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <Layers size={18} /> Fogások Konfigurációja ({newCatCourses.length} db)
+                                      </span>
+                                      <button
+                                        type="button"
+                                        className="btn"
+                                        style={{ padding: '6px 12px', fontSize: '11px', background: '#0a84ff', color: 'white', border: 'none', borderRadius: '20px', fontWeight: 600, cursor: 'pointer' }}
+                                        onClick={() => {
+                                          const nextId = newCatCourses.length > 0 ? Math.max(...newCatCourses.map(c => c.id)) + 1 : 1;
+                                          setNewCatCourses([...newCatCourses, {
+                                            id: nextId,
+                                            name: `${newCatCourses.length + 1}. Fogás`,
+                                            sourceType: 'individual',
+                                            itemIds: [],
+                                            itemOverrides: {}
+                                          }]);
+                                        }}
+                                      >
+                                        + Új Fogás
+                                      </button>
+                                    </div>
+
+                                    {newCatCourses.length === 0 ? (
+                                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontStyle: 'italic', textAlign: 'center', padding: '24px 0', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: '10px' }}>
+                                        Még nincsenek fogások hozzáadva.
+                                      </div>
+                                    ) : (
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', paddingRight: '4px' }}>
+                                        {newCatCourses.map((course) => {
+                                          let courseItems: MenuItem[] = [];
+                                          if (course.sourceType === 'category' && course.sourceCategoryId) {
+                                            courseItems = db.items.filter((i: any) => i.category_id === course.sourceCategoryId && i.is_active !== false);
+                                          } else if (course.sourceType === 'individual' && course.itemIds) {
+                                            courseItems = db.items.filter((i: any) => course.itemIds?.includes(i.id) && i.is_active !== false);
+                                          }
+
+                                          return (
+                                            <div key={course.id} style={{ border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px', padding: '12px', background: 'rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <input 
+                                                  type="text"
+                                                  className="input-field"
+                                                  style={{ height: '32px', width: '60%', fontSize: '13px', fontWeight: 'bold', padding: '0 8px', borderRadius: '6px' }}
+                                                  value={course.name}
+                                                  onChange={e => {
+                                                    const val = e.target.value;
+                                                    setNewCatCourses(newCatCourses.map(c => c.id === course.id ? { ...c, name: val } : c));
+                                                  }}
+                                                />
+                                                <button
+                                                  type="button"
+                                                  className="btn"
+                                                  style={{ padding: '6px 12px', fontSize: '11px', background: 'rgba(255,69,58,0.12)', color: '#ff453a', border: '1px solid rgba(255,69,58,0.2)', borderRadius: '8px', cursor: 'pointer' }}
+                                                  onClick={() => {
+                                                    setNewCatCourses(newCatCourses.filter(c => c.id !== course.id));
+                                                  }}
+                                                >
+                                                  Töröl
+                                                </button>
+                                              </div>
+
+                                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                                <div>
+                                                  <label style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>Forrás típusa</label>
+                                                  <select
+                                                    className="input-field"
+                                                    style={{ height: '32px', fontSize: '12px', padding: '0 4px', background: 'rgba(0,0,0,0.4)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px' }}
+                                                    value={course.sourceType}
+                                                    onChange={e => {
+                                                      const type = e.target.value as 'category' | 'individual';
+                                                      setNewCatCourses(newCatCourses.map(c => c.id === course.id ? { ...c, sourceType: type, sourceCategoryId: null, itemIds: [], itemOverrides: {} } : c));
+                                                    }}
+                                                  >
+                                                    <option value="individual">Egyedi ételek</option>
+                                                    <option value="category">Teljes kategória</option>
+                                                  </select>
+                                                </div>
+
+                                                {course.sourceType === 'category' ? (
+                                                  <div>
+                                                    <label style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>Kategória</label>
+                                                    <select
+                                                      className="input-field"
+                                                      style={{ height: '32px', fontSize: '12px', padding: '0 4px', background: 'rgba(0,0,0,0.4)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px' }}
+                                                      value={course.sourceCategoryId || ''}
+                                                      onChange={e => {
+                                                        const catId = Number(e.target.value) || null;
+                                                        setNewCatCourses(newCatCourses.map(c => c.id === course.id ? { ...c, sourceCategoryId: catId, itemOverrides: {} } : c));
+                                                      }}
+                                                    >
+                                                      <option value="">-- Válassz --</option>
+                                                      {db.categories.filter((c: any) => c.id !== editingCategory.id && !c.is_menu_category).map((c: any) => (
+                                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                                      ))}
+                                                    </select>
+                                                  </div>
+                                                ) : (
+                                                  <div>
+                                                    <label style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>Ételek</label>
+                                                    <div style={{ maxHeight: '90px', overflowY: 'auto', border: '1px solid rgba(255,255,255,0.08)', padding: '6px', borderRadius: '6px', background: 'rgba(0,0,0,0.3)' }}>
+                                                      {db.items.map((item: any) => {
+                                                        const isChecked = course.itemIds?.includes(item.id);
+                                                        return (
+                                                          <label key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', cursor: 'pointer', color: 'white', margin: '3px 0' }}>
+                                                            <input 
+                                                              type="checkbox"
+                                                              checked={isChecked}
+                                                              onChange={() => {
+                                                                const updatedIds = isChecked 
+                                                                  ? (course.itemIds || []).filter(id => id !== item.id)
+                                                                  : [...(course.itemIds || []), item.id];
+                                                                
+                                                                const updatedOverrides = { ...(course.itemOverrides || {}) };
+                                                                if (isChecked) {
+                                                                  delete updatedOverrides[item.id];
+                                                                }
+
+                                                                setNewCatCourses(newCatCourses.map(c => c.id === course.id ? { ...c, itemIds: updatedIds, itemOverrides: updatedOverrides } : c));
+                                                              }}
+                                                            />
+                                                            {item.name}
+                                                          </label>
+                                                        );
+                                                      })}
+                                                    </div>
+                                                  </div>
+                                                )}
+                                              </div>
+
+                                              {courseItems.length > 0 && (
+                                                <div style={{ marginTop: '6px', borderTop: '1px dashed rgba(255,255,255,0.08)', paddingTop: '8px' }}>
+                                                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: '#0a84ff' }}>
+                                                    Ételek felülírásai:
+                                                  </span>
+                                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+                                                    {courseItems.map((item) => {
+                                                      const override = course.itemOverrides?.[item.id] || { price: item.price, ingredients: item.ingredients || [] };
+                                                      
+                                                      return (
+                                                        <div key={item.id} style={{ padding: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '6px' }}>
+                                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                                            <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'white' }}>{item.name}</span>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                              <label style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Ár (FT):</label>
+                                                              <input 
+                                                                type="number"
+                                                                className="input-field"
+                                                                style={{ height: '26px', width: '70px', fontSize: '11px', padding: '0 6px', borderRadius: '4px' }}
+                                                                value={override.price}
+                                                                onChange={e => {
+                                                                  const price = parseInt(e.target.value) || 0;
+                                                                  const updatedOverrides = {
+                                                                    ...(course.itemOverrides || {}),
+                                                                    [item.id]: {
+                                                                      ...override,
+                                                                      price
+                                                                    }
+                                                                  };
+                                                                  setNewCatCourses(newCatCourses.map(c => c.id === course.id ? { ...c, itemOverrides: updatedOverrides } : c));
+                                                                }}
+                                                              />
+                                                            </div>
+                                                          </div>
+
+                                                          {override.ingredients && override.ingredients.length > 0 && (
+                                                            <div style={{ marginTop: '6px', paddingLeft: '8px', borderLeft: '1px solid rgba(255,255,255,0.1)' }}>
+                                                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                                                                {override.ingredients.map((ing, ingIdx) => {
+                                                                  const inv = db.inventory.find((i: any) => i.id === ing.ingredientId);
+                                                                  return (
+                                                                    <div key={ing.ingredientId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
+                                                                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={inv ? inv.name : ''}>
+                                                                        {inv ? inv.name : `Alapanyag #${ing.ingredientId}`}
+                                                                      </span>
+                                                                      <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                                                                        <input 
+                                                                          type="number"
+                                                                          className="input-field"
+                                                                          style={{ height: '22px', width: '50px', fontSize: '10px', padding: '2px', borderRadius: '4px' }}
+                                                                          step="any"
+                                                                          value={ing.quantity}
+                                                                          onChange={e => {
+                                                                            const qty = parseFloat(e.target.value) || 0;
+                                                                            const updatedIngs = override.ingredients.map((ig, igx) => igx === ingIdx ? { ...ig, quantity: qty } : ig);
+                                                                            const updatedOverrides = {
+                                                                              ...(course.itemOverrides || {}),
+                                                                              [item.id]: {
+                                                                                ...override,
+                                                                                ingredients: updatedIngs
+                                                                              }
+                                                                            };
+                                                                            setNewCatCourses(newCatCourses.map(c => c.id === course.id ? { ...c, itemOverrides: updatedOverrides } : c));
+                                                                          }}
+                                                                        />
+                                                                        <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{inv?.unit || ''}</span>
+                                                                      </div>
+                                                                    </div>
+                                                                  );
+                                                                })}
+                                                              </div>
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      );
+                                                    })}
+                                                  </div>
+                                                </div>
+                                              )}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
                         </div>
 
                         {/* Modal Footer */}
-                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '14px', borderTop: '1px solid var(--glass-border)', paddingTop: '12px' }}>
-                          <button className="btn" onClick={() => setEditingCategory(null)}>Mégse</button>
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '10px', paddingTop: '14px', borderTop: '1px solid var(--glass-border)' }}>
                           <button 
-                            className="btn"
-                            style={{ background: '#bf5af2', color: 'white' }}
+                            type="button"
+                            className="btn" 
+                            style={{ padding: '10px 28px', borderRadius: '20px', fontWeight: 600, background: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', fontSize: '13px' }}
+                            onClick={() => setEditingCategory(null)}
+                          >
+                            Mégse
+                          </button>
+                          <button 
+                            type="button"
+                            className="btn btn-primary"
+                            style={{ padding: '10px 28px', borderRadius: '20px', fontWeight: 600, background: '#0a84ff', color: 'white', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(10,132,255,0.3)', fontSize: '13px' }}
                             onClick={() => {
                               const nameTrimmed = newCatName.trim();
                               if (!nameTrimmed) return;
 
-                              const promoObj: PromotionSettings = {
+                              const promoObj = {
                                 isEnabled: promoIsEnabled,
                                 type: promoType,
                                 onceDate: promoType === 'once' ? promoOnceDate : undefined,
                                 recurringDays: promoType === 'recurring' ? promoRecurringDays : undefined,
                                 recurringWeeksInterval: promoType === 'recurring' ? promoRecurringWeeksInterval : undefined,
                                 recurringStartDate: promoType === 'recurring' && promoRecurringWeeksInterval > 1 ? promoRecurringStartDate : undefined,
-                                priceAdjustmentType: 'percent',
+                                priceAdjustmentType: 'percent' as const,
                                 priceAdjustmentValue: promoPriceAdjustmentValue,
                                 packagingFeePolicy: promoPackagingFeePolicy
                               };
 
-                              const menuSched: MenuSchedule | undefined = newCatIsMenuCategory ? {
-                                  days: newCatScheduleDays,
-                                  fromTime: newCatScheduleFrom || undefined,
-                                  toTime: newCatScheduleTo || undefined
-                                } : undefined;
+                              const menuSched = newCatIsMenuCategory ? {
+                                days: newCatScheduleDays,
+                                fromTime: newCatScheduleFrom || undefined,
+                                toTime: newCatScheduleTo || undefined
+                              } : undefined;
 
                               let updated = [...db.categories];
                               if (editingCategory.id === 0) {
@@ -6687,7 +6819,6 @@ export default function App() {
                       </div>
                     </div>
                   )}
-
                   {/* Sliding Container for Tables (smooth horizontal switch) */}
                   <div style={{ overflow: 'hidden', width: '100%', borderRadius: 'var(--radius-md)', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                     <div style={{ 
@@ -7010,6 +7141,7 @@ export default function App() {
                                         style={{ padding: '6px 14px', fontSize: '12px', background: 'rgba(255,255,255,0.06)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', marginRight: '6px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s ease' }}
                                         onClick={() => {
                                           setEditingCategory(cat);
+                                          setEditingCategoryTab('general');
                                           setNewCatName(cat.name);
                                           setNewCatDescription(cat.description || '');
                                           setNewCatLinkedCategoryId(cat.linked_category_id !== undefined && cat.linked_category_id !== null ? cat.linked_category_id : 'none');
