@@ -1039,7 +1039,10 @@ export default function App() {
     const itemsList: Array<{ id: number; raw_name: string; quantity: number; unit: string; matched_item_id: number | null }> = [];
     let idCounter = 1;
 
-    const itemRegex = /(.+?)\s+(\d+(?:[.,]\d+)?)\s*(db|kg|g|l|liter|üveg|csomag|karton|szál|pohár)\b/i;
+    // Regex 1: Metro invoice columns layout: Barcode, VTSZ, Description, Unit, Db/Csom, Mennyiség
+    const metroRegex = /^(\+?\d+)\s+(\d+)\s+(.+?)\s+([A-Z]{2,6})\s+(\d+(?:[.,]\d+)?)\s+(\d+(?:[.,]\d+)?)/i;
+    // Regex 2: Legacy fallback format: Description Quantity Unit
+    const legacyRegex = /(.+?)\s+(\d+(?:[.,]\d+)?)\s*(db|kg|g|l|liter|üveg|csomag|karton|szál|pohár)\b/i;
 
     for (let line of lines) {
       line = line.trim();
@@ -1050,15 +1053,18 @@ export default function App() {
         continue;
       }
 
-      const match = line.match(itemRegex);
-      if (match) {
-        const rawName = match[1].trim();
-        const qtyStr = match[2].replace(',', '.');
-        const quantity = parseFloat(qtyStr);
-        const unit = match[3].toLowerCase();
+      // Try matching Metro layout first
+      const metroMatch = line.match(metroRegex);
+      if (metroMatch) {
+        const rawName = metroMatch[3].trim();
+        const dbCsom = parseFloat(metroMatch[5].replace(',', '.'));
+        const quantityVal = parseFloat(metroMatch[6].replace(',', '.'));
+        const unit = metroMatch[4].toLowerCase();
+        
+        // Compute total quantity rounded to 3 decimals
+        const quantity = Math.round(dbCsom * quantityVal * 1000) / 1000;
 
         let cleanName = rawName.replace(/^\d+[\s\.\)-]+/, '').trim();
-        
         if (cleanName.length < 2 || /^\d+$/.test(cleanName)) {
           continue;
         }
@@ -1067,7 +1073,6 @@ export default function App() {
         if (isDuplicate) continue;
 
         let matchedId: number | null = null;
-        
         const aliasObj = (aliases || []).find(a => a.raw_name.toLowerCase() === cleanName.toLowerCase());
         if (aliasObj) {
           matchedId = aliasObj.inventory_item_id;
@@ -1095,6 +1100,52 @@ export default function App() {
           unit,
           matched_item_id: matchedId
         });
+      } else {
+        // Fallback to legacy layout
+        const legacyMatch = line.match(legacyRegex);
+        if (legacyMatch) {
+          const rawName = legacyMatch[1].trim();
+          const qtyStr = legacyMatch[2].replace(',', '.');
+          const quantity = parseFloat(qtyStr);
+          const unit = legacyMatch[3].toLowerCase();
+
+          let cleanName = rawName.replace(/^\d+[\s\.\)-]+/, '').trim();
+          if (cleanName.length < 2 || /^\d+$/.test(cleanName)) {
+            continue;
+          }
+
+          const isDuplicate = itemsList.some(item => item.raw_name === cleanName && item.quantity === quantity);
+          if (isDuplicate) continue;
+
+          let matchedId: number | null = null;
+          const aliasObj = (aliases || []).find(a => a.raw_name.toLowerCase() === cleanName.toLowerCase());
+          if (aliasObj) {
+            matchedId = aliasObj.inventory_item_id;
+          } else {
+            const exactInv = (inventory || []).find(inv => inv.name.toLowerCase() === cleanName.toLowerCase() && inv.is_active !== false);
+            if (exactInv) {
+              matchedId = exactInv.id;
+            } else {
+              const fuzzyInv = (inventory || []).find(inv => {
+                if (inv.is_active === false) return false;
+                const invLower = inv.name.toLowerCase();
+                const cleanLower = cleanName.toLowerCase();
+                return cleanLower.includes(invLower) || invLower.includes(cleanLower);
+              });
+              if (fuzzyInv) {
+                matchedId = fuzzyInv.id;
+              }
+            }
+          }
+
+          itemsList.push({
+            id: idCounter++,
+            raw_name: cleanName,
+            quantity,
+            unit,
+            matched_item_id: matchedId
+          });
+        }
       }
     }
 
