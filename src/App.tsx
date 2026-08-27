@@ -12656,8 +12656,11 @@ export default function App() {
           const reader = new FileReader();
           reader.onload = async (e) => {
             try {
-              const arrayBuffer = e.target?.result as ArrayBuffer;
-              const uint8Array = new Uint8Array(arrayBuffer);
+              const dataUrl = e.target?.result as string;
+              if (!dataUrl) {
+                throw new Error("Nem sikerült beolvasni a fájlt.");
+              }
+              const base64Data = dataUrl.split(',')[1];
 
               setAnalysisProgress(35);
               setAnalysisStep('PDF szöveg kinyerése folyamatban...');
@@ -12666,7 +12669,7 @@ export default function App() {
                 throw new Error("Az offline PDF-olvasó nem elérhető ebben a környezetben.");
               }
 
-              const result = await window.electronAPI.parseInvoicePdf(uint8Array);
+              const result = await window.electronAPI.parseInvoicePdf({ type: 'base64', data: base64Data });
               
               if (!result.success || !result.text) {
                 throw new Error(result.error || "Nem sikerült szöveget kinyerni a PDF-ből. Győződj meg róla, hogy digitális számla PDF-et töltesz fel!");
@@ -12716,7 +12719,7 @@ export default function App() {
             setFeltoltesUploadedFileName(null);
           };
 
-          reader.readAsArrayBuffer(file);
+          reader.readAsDataURL(file);
         };
 
         const handleMatchChange = (pdfItemId: number, newMatchedId: number | null) => {

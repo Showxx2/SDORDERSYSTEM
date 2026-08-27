@@ -4,6 +4,6 @@ interface Window {
     dbSave: (data: any) => Promise<{ success: boolean; error?: string }>;
     getPrinters?: () => Promise<any[]>;
     printReceipt?: (htmlContent: string, printerName?: string, silentParam?: boolean) => Promise<{ success: boolean; error?: string }>;
-    parseInvoicePdf?: (pdfData: string | Uint8Array) => Promise<{ success: boolean; text?: string; error?: string }>;
+    parseInvoicePdf?: (pdfData: string | Uint8Array | { type: 'base64'; data: string }) => Promise<{ success: boolean; text?: string; error?: string }>;
   };
 }

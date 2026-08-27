@@ -292,17 +292,18 @@ ipcMain.handle('db-save', async (event, data) => {
   return saveDatabase(data);
 });
 
-ipcMain.handle('parse-invoice-pdf', async (event, pdfData) => {
+ipcMain.handle('parse-invoice-pdf', async (event, payload) => {
   try {
     let dataBuffer;
-    if (typeof pdfData === 'string') {
-      if (!fs.existsSync(pdfData)) {
-        throw new Error(`File not found: ${pdfData}`);
+    if (typeof payload === 'string') {
+      if (!fs.existsSync(payload)) {
+        throw new Error(`File not found: ${payload}`);
       }
-      dataBuffer = fs.readFileSync(pdfData);
-    } else if (pdfData && (Buffer.isBuffer(pdfData) || pdfData instanceof Uint8Array || (typeof pdfData === 'object' && pdfData.buffer))) {
-      // In case Electron IPC wraps it as typed array or Node Buffer
-      dataBuffer = Buffer.from(pdfData.buffer || pdfData);
+      dataBuffer = fs.readFileSync(payload);
+    } else if (payload && payload.type === 'base64') {
+      dataBuffer = Buffer.from(payload.data, 'base64');
+    } else if (payload && (Buffer.isBuffer(payload) || payload instanceof Uint8Array || (typeof payload === 'object' && payload.buffer))) {
+      dataBuffer = Buffer.from(payload.buffer || payload);
     } else {
       throw new Error("Invalid PDF data type received.");
     }
