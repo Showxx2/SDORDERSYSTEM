@@ -5488,11 +5488,11 @@ export default function App() {
                                   <div ref={promoPanelRef} style={{
                                     border: '1px solid rgba(255,255,255,0.08)',
                                     borderRadius: '12px',
-                                    padding: '24px',
+                                    padding: '16px 20px',
                                     background: 'rgba(255,255,255,0.02)',
                                     display: 'flex',
                                     flexDirection: 'column',
-                                    gap: '20px'
+                                    gap: '12px'
                                   }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                       <span style={{ fontSize: '15px', fontWeight: 700, color: '#0a84ff' }}>
@@ -5541,13 +5541,13 @@ export default function App() {
                                     </div>
 
                                     {promoIsEnabled ? (
-                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', borderTop: '1px dashed rgba(255,255,255,0.08)', paddingTop: '20px' }}>
+                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px dashed rgba(255,255,255,0.08)', paddingTop: '12px' }}>
                                         {hasCategoryPromotion && (
                                           <div style={{
                                             background: 'rgba(255, 159, 10, 0.12)',
                                             border: '1px solid rgba(255, 159, 10, 0.25)',
                                             borderRadius: '8px',
-                                            padding: '12px 16px',
+                                            padding: '8px 12px',
                                             color: '#ff9f0a',
                                             fontSize: '13px',
                                             lineHeight: '1.5',
@@ -5557,9 +5557,9 @@ export default function App() {
                                           </div>
                                         )}
 
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                           <div>
-                                            <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block' }}>Típus</label>
+                                            <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px', display: 'block' }}>Típus</label>
                                             <AppleSelect
                                               value={promoType}
                                               onChange={val => setPromoType(val as 'once' | 'recurring')}
@@ -5576,7 +5576,7 @@ export default function App() {
 
                                           {promoType === 'once' ? (
                                             <div>
-                                              <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block' }}>Dátum</label>
+                                              <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px', display: 'block' }}>Dátum</label>
                                               <input 
                                                 type="date"
                                                 className="input-field"
@@ -5587,7 +5587,7 @@ export default function App() {
                                             </div>
                                           ) : (
                                             <div>
-                                              <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block' }}>Gyakoriság</label>
+                                              <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px', display: 'block' }}>Gyakoriság</label>
                                               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                                 <input 
                                                   type="number"
@@ -5606,8 +5606,8 @@ export default function App() {
                                         {promoType === 'recurring' && (
                                           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                             <div>
-                                              <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '10px', display: 'block' }}>Ismétlődés napjai</label>
-                                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                              <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px', display: 'block' }}>Ismétlődés napjai</label>
+                                              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                                                 {[
                                                   { val: 1, label: 'Hétfő' },
                                                   { val: 2, label: 'Kedd' },
@@ -5630,7 +5630,7 @@ export default function App() {
                                                         }
                                                       }}
                                                       style={{
-                                                        padding: '10px 18px',
+                                                        padding: '8px 14px',
                                                         borderRadius: '8px',
                                                         border: '1px solid rgba(255,255,255,0.08)',
                                                         background: isSelected ? '#0a84ff' : 'rgba(0,0,0,0.2)',
@@ -5663,9 +5663,9 @@ export default function App() {
                                           </div>
                                         )}
 
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                           <div>
-                                            <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', display: 'block' }}>Módosítás típusa</label>
+                                            <label className="input-label" style={{ fontSize: '13px', fontWeight: 600, marginBottom: '4px', display: 'block' }}>Módosítás típusa</label>
                                             <AppleSelect
                                               value={promoPriceAdjustmentType}
                                               onChange={val => setPromoPriceAdjustmentType(val as 'percent' | 'fixed')}
