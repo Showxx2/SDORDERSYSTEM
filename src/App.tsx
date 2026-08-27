@@ -429,6 +429,35 @@ const detectAllergens = (ingredientName: string): { name: string; code: string }
   return matched;
 };
 
+const getDishStockStatus = (menuItem: any, inventory: any[], ingredientsOverride?: any[]) => {
+  const ingredients = ingredientsOverride || menuItem.ingredients;
+  if (!ingredients || ingredients.length === 0) {
+    return { status: 'ok', oosIngredient: null };
+  }
+
+  let hasWarning = false;
+  let hasOutOfStock = false;
+  let oosName = null;
+
+  for (const ing of ingredients) {
+    const invItem = (inventory || []).find((inv: any) => inv.id === ing.ingredientId);
+    if (invItem) {
+      if (invItem.quantity <= 0 || invItem.quantity < ing.quantity) {
+        hasOutOfStock = true;
+        oosName = invItem.name;
+        break;
+      }
+      if (invItem.quantity <= (invItem.warning_limit || 0)) {
+        hasWarning = true;
+      }
+    }
+  }
+
+  if (hasOutOfStock) return { status: 'out_of_stock', oosIngredient: oosName };
+  if (hasWarning) return { status: 'warning', oosIngredient: null };
+  return { status: 'ok', oosIngredient: null };
+};
+
 interface ChatMessage {
   id: number;
   sender: 'user' | 'bot';
@@ -1542,6 +1571,26 @@ export default function App() {
 
   // Save database helper (with real-time API syncing for browser)
   const saveDatabase = async (newDb: any) => {
+    if (db?.inventory && newDb?.inventory) {
+      const newlyWarned: string[] = [];
+      newDb.inventory.forEach((newItem: any) => {
+        const oldItem = db.inventory.find((i: any) => i.id === newItem.id);
+        if (oldItem) {
+          const oldQty = oldItem.quantity;
+          const newQty = newItem.quantity;
+          const limit = newItem.warning_limit || 0;
+          if (oldQty > limit && newQty <= limit) {
+            newlyWarned.push(`- ${newItem.name} (Aktuális készlet: ${newQty} ${newItem.unit || 'egység'}, limit: ${limit} ${newItem.unit || 'egység'})`);
+          }
+        }
+      });
+      if (newlyWarned.length > 0) {
+        setTimeout(() => {
+          alert(`⚠️ RAKTÁR FIGYELMEZTETÉS!\n\nAz alábbi alapanyag(ok) elérte(k) vagy átlépte(k) a figyelmeztetési limitet:\n\n${newlyWarned.join('\n')}`);
+        }, 100);
+      }
+    }
+
     setDb(newDb);
     if (window.electronAPI) {
       await window.electronAPI.dbSave(newDb);
@@ -4756,11 +4805,35 @@ export default function App() {
                       .filter((item: MenuItem) => item.category_id === selectedCategoryId && item.is_active !== false)
                       .map((item: MenuItem) => {
                         const pricing = getItemCurrentPricing(item, db.categories);
+                        const stockStatus = getDishStockStatus(item, db.inventory);
+
+                        let cardStyle: React.CSSProperties = {};
+                        if (stockStatus.status === 'out_of_stock') {
+                          cardStyle = {
+                            border: '2px solid #ff453a',
+                            boxShadow: '0 0 12px rgba(255, 69, 58, 0.25)',
+                            opacity: 0.65,
+                            cursor: 'not-allowed'
+                          };
+                        } else if (stockStatus.status === 'warning') {
+                          cardStyle = {
+                            border: '2px solid #ff9f0a',
+                            boxShadow: '0 0 12px rgba(255, 159, 10, 0.2)'
+                          };
+                        }
+
                         return (
                           <div 
                             key={item.id} 
                             className="item-card"
-                            onClick={() => addToCart(item)}
+                            style={cardStyle}
+                            onClick={() => {
+                              if (stockStatus.status === 'out_of_stock') {
+                                alert(`Nem rendelhető: A(z) "${item.name}" ételhez szükséges "${stockStatus.oosIngredient}" alapanyag teljesen elfogyott!`);
+                                return;
+                              }
+                              addToCart(item);
+                            }}
                           >
                             <span className="item-name">{item.name}</span>
                             <div className="item-details">
@@ -4791,6 +4864,16 @@ export default function App() {
                               <span className="item-pack-fee">
                                 Csomagolás: {pricing.packagingFee > 0 ? `${pricing.packagingFee} FT` : 'ingyenes'}
                               </span>
+                              {stockStatus.status === 'out_of_stock' && (
+                                <span style={{ fontSize: '10px', color: '#ff453a', fontWeight: 700, marginTop: '4px', display: 'block' }}>
+                                  ❌ ELFOGYOTT ({stockStatus.oosIngredient})
+                                </span>
+                              )}
+                              {stockStatus.status === 'warning' && (
+                                <span style={{ fontSize: '10px', color: '#ff9f0a', fontWeight: 700, marginTop: '4px', display: 'block' }}>
+                                  ⚠️ ALACSONY KÉSZLET
+                                </span>
+                              )}
                             </div>
                           </div>
                         );
@@ -11318,29 +11401,55 @@ export default function App() {
                     {attachmentItems.map((attItem: MenuItem) => {
                       const isSelected = selectedAttachmentItem?.id === attItem.id;
                       const pricing = getItemCurrentPricing(attItem, db.categories);
+                      const stockStatus = getDishStockStatus(attItem, db.inventory);
+
+                      let cardStyle: React.CSSProperties = {
+                        background: isSelected ? 'rgba(10, 132, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                        border: isSelected ? '2px solid var(--primary)' : '2px solid rgba(255, 255, 255, 0.08)',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        minHeight: '100px',
+                        transition: 'all 0.2s ease',
+                        boxShadow: isSelected ? '0 0 10px rgba(10, 132, 255, 0.15)' : 'none'
+                      };
+
+                      if (stockStatus.status === 'out_of_stock') {
+                        cardStyle = {
+                          ...cardStyle,
+                          border: '2px solid #ff453a',
+                          boxShadow: '0 0 12px rgba(255, 69, 58, 0.25)',
+                          opacity: 0.65,
+                          cursor: 'not-allowed'
+                        };
+                      } else if (stockStatus.status === 'warning') {
+                        cardStyle = {
+                          ...cardStyle,
+                          border: '2px solid #ff9f0a',
+                          boxShadow: '0 0 12px rgba(255, 159, 10, 0.2)'
+                        };
+                      }
+
                       return (
                         <div
                           key={attItem.id}
-                          style={{
-                            background: isSelected ? 'rgba(10, 132, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
-                            border: isSelected ? '2px solid var(--primary)' : '2px solid rgba(255, 255, 255, 0.08)',
-                            borderRadius: '12px',
-                            padding: '16px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between',
-                            minHeight: '100px',
-                            transition: 'all 0.2s ease',
-                            boxShadow: isSelected ? '0 0 10px rgba(10, 132, 255, 0.15)' : 'none'
+                          style={cardStyle}
+                          onClick={() => {
+                            if (stockStatus.status === 'out_of_stock') {
+                              alert(`Nem választható: A(z) "${attItem.name}" termékhez szükséges "${stockStatus.oosIngredient}" alapanyag teljesen elfogyott!`);
+                              return;
+                            }
+                            setSelectedAttachmentItem(attItem);
                           }}
-                          onClick={() => setSelectedAttachmentItem(attItem)}
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
                             <span style={{ fontSize: '13px', fontWeight: 700, color: 'white', wordBreak: 'break-word' }}>{attItem.name}</span>
                             {isSelected && <CheckCircle2 size={16} color="var(--primary)" />}
                           </div>
-                          <div style={{ marginTop: '12px' }}>
+                          <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                             {pricing.price < attItem.price ? (
                               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'baseline' }}>
                                 <span style={{ fontSize: '12px', textDecoration: 'line-through', color: 'var(--text-muted)' }}>{attItem.price.toLocaleString()} FT</span>
@@ -11349,9 +11458,19 @@ export default function App() {
                             ) : (
                               <span style={{ fontSize: '16px', fontWeight: 800, color: 'white' }}>{pricing.price.toLocaleString()} FT</span>
                             )}
-                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                               Csomagolás: {pricing.packagingFee > 0 ? `${pricing.packagingFee} FT` : 'ingyenes'}
                             </div>
+                            {stockStatus.status === 'out_of_stock' && (
+                              <span style={{ fontSize: '9px', color: '#ff453a', fontWeight: 700 }}>
+                                ❌ ELFOGYOTT ({stockStatus.oosIngredient})
+                              </span>
+                            )}
+                            {stockStatus.status === 'warning' && (
+                              <span style={{ fontSize: '9px', color: '#ff9f0a', fontWeight: 700 }}>
+                                ⚠️ ALACSONY KÉSZLET
+                              </span>
+                            )}
                           </div>
                         </div>
                       );
@@ -11616,28 +11735,70 @@ export default function App() {
                     const pricing = getItemCurrentPricing(item, db.categories);
                     const finalPrice = overrides ? overrides.price : pricing.price;
 
+                    const finalIngredients = overrides && overrides.ingredients 
+                      ? overrides.ingredients 
+                      : (item.ingredients || []);
+                      
+                    const stockStatus = getDishStockStatus(item, db.inventory, finalIngredients);
+
+                    let cardStyle: React.CSSProperties = {
+                      background: 'rgba(255,255,255,0.02)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: '10px',
+                      padding: '14px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      minHeight: '90px',
+                      transition: 'all 0.15s ease'
+                    };
+
+                    if (stockStatus.status === 'out_of_stock') {
+                      cardStyle = {
+                        ...cardStyle,
+                        border: '2px solid #ff453a',
+                        boxShadow: '0 0 12px rgba(255, 69, 58, 0.25)',
+                        opacity: 0.65,
+                        cursor: 'not-allowed'
+                      };
+                    } else if (stockStatus.status === 'warning') {
+                      cardStyle = {
+                        ...cardStyle,
+                        border: '2px solid #ff9f0a',
+                        boxShadow: '0 0 12px rgba(255, 159, 10, 0.2)'
+                      };
+                    }
+
                     return (
                       <div 
                         key={item.id}
-                        onClick={() => handleChoice(item.id)}
-                        style={{
-                          background: 'rgba(255,255,255,0.02)',
-                          border: '1px solid rgba(255,255,255,0.08)',
-                          borderRadius: '10px',
-                          padding: '14px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'space-between',
-                          minHeight: '90px',
-                          transition: 'all 0.15s ease'
+                        onClick={() => {
+                          if (stockStatus.status === 'out_of_stock') {
+                            alert(`Nem rendelhető: A(z) "${item.name}" ételhez szükséges "${stockStatus.oosIngredient}" alapanyag teljesen elfogyott!`);
+                            return;
+                          }
+                          handleChoice(item.id);
                         }}
+                        style={cardStyle}
                       >
                         <span style={{ fontSize: '13px', fontWeight: 700, color: 'white' }}>{item.name}</span>
-                        <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                          <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--primary)' }}>
-                            {finalPrice.toLocaleString()} FT
-                          </span>
+                        <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--primary)' }}>
+                              {finalPrice.toLocaleString()} FT
+                            </span>
+                          </div>
+                          {stockStatus.status === 'out_of_stock' && (
+                            <span style={{ fontSize: '9px', color: '#ff453a', fontWeight: 700 }}>
+                              ❌ ELFOGYOTT ({stockStatus.oosIngredient})
+                            </span>
+                          )}
+                          {stockStatus.status === 'warning' && (
+                            <span style={{ fontSize: '9px', color: '#ff9f0a', fontWeight: 700 }}>
+                              ⚠️ ALACSONY KÉSZLET
+                            </span>
+                          )}
                         </div>
                       </div>
                     );
