@@ -12741,12 +12741,23 @@ export default function App() {
                   .trim();
               };
 
-              const matchedSupplier = db.suppliers.find((s: any) => {
+              let matchedSupplier = db.suppliers.find((s: any) => {
                 if (s.is_active === false) return false;
                 const cleanS = cleanSupplierName(s.name);
                 const cleanTxt = rawText.toLowerCase();
                 return cleanS.length >= 3 && cleanTxt.includes(cleanS);
               });
+
+              if (!matchedSupplier) {
+                // Fallback to first word (e.g. matching "metro" from "Metro Nagykereskedés")
+                matchedSupplier = db.suppliers.find((s: any) => {
+                  if (s.is_active === false) return false;
+                  const cleanS = cleanSupplierName(s.name);
+                  const firstWord = cleanS.split(/\s+/)[0];
+                  const cleanTxt = rawText.toLowerCase();
+                  return firstWord.length >= 3 && cleanTxt.includes(firstWord);
+                });
+              }
 
               if (matchedSupplier) {
                 setFeltoltesSupplierId(String(matchedSupplier.id));
