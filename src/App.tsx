@@ -5296,7 +5296,7 @@ export default function App() {
                       <div className="modal-card" style={{
                         maxWidth: '950px',
                         width: '95%',
-                        height: `${tabHeight + (editingItemTab === 'general' ? 260 : 310)}px`,
+                        height: `${tabHeight + (editingItemTab === 'general' ? 290 : 340)}px`,
                         maxHeight: '95vh',
                         background: 'var(--panel-bg)',
                         border: '1px solid var(--glass-border)',
