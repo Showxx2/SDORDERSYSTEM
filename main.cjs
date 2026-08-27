@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const pdfParse = require('pdf-parse');
+const { PDFParse } = require('pdf-parse');
 
 let mainWindow;
 let server = null;
@@ -307,7 +307,11 @@ ipcMain.handle('parse-invoice-pdf', async (event, payload) => {
     } else {
       throw new Error("Invalid PDF data type received.");
     }
-    const parsedData = await pdfParse(dataBuffer);
+    const uint8Array = Buffer.isBuffer(dataBuffer)
+      ? new Uint8Array(dataBuffer.buffer, dataBuffer.byteOffset, dataBuffer.byteLength)
+      : new Uint8Array(dataBuffer);
+    const parser = new PDFParse(uint8Array);
+    const parsedData = await parser.getText();
     return { success: true, text: parsedData.text };
   } catch (error) {
     console.error('Error parsing PDF:', error);
