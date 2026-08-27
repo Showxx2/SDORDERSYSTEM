@@ -37,7 +37,10 @@
     "appId": "com.ordersystem.app",
     "productName": "EtelrendeloProgram",
     "win": {
-      "target": "portable"
+      "target": [
+        "nsis",
+        "portable"
+      ]
     },
     "directories": {
       "output": "C:/Users/User/ordersystem-release"
