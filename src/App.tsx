@@ -12811,7 +12811,7 @@ export default function App() {
                   .trim();
               };
 
-              let matchedSupplier = db.suppliers.find((s: any) => {
+              let matchedSupplier = (db.suppliers || []).find((s: any) => {
                 if (s.is_active === false) return false;
                 const cleanS = cleanSupplierName(s.name);
                 const cleanTxt = rawText.toLowerCase();
@@ -12820,7 +12820,7 @@ export default function App() {
 
               if (!matchedSupplier) {
                 // Fallback to first word (e.g. matching "metro" from "Metro Nagykereskedés")
-                matchedSupplier = db.suppliers.find((s: any) => {
+                matchedSupplier = (db.suppliers || []).find((s: any) => {
                   if (s.is_active === false) return false;
                   const cleanS = cleanSupplierName(s.name);
                   const firstWord = cleanS.split(/\s+/)[0];
@@ -12938,7 +12938,7 @@ export default function App() {
             id: db.inventoryFills ? db.inventoryFills.length + 1 : 1,
             invoice_number: feltoltesInvoiceNum || `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
             supplier_id: feltoltesSupplierId,
-            supplier_name: db.suppliers.find((s: any) => s.id === feltoltesSupplierId)?.name || 'Ismeretlen partner',
+            supplier_name: (db.suppliers || []).find((s: any) => s.id === feltoltesSupplierId)?.name || 'Ismeretlen partner',
             date: new Date().toISOString(),
             user: currentUser?.name || 'Rendszer',
             items: feltoltesItemsList
@@ -13017,7 +13017,7 @@ export default function App() {
           return inv.name.toLowerCase().includes(feltoltesSearchQuery.toLowerCase());
         });
 
-        const selectedSupplier = db.suppliers.find((s: any) => s.id === feltoltesSupplierId);
+        const selectedSupplier = (db.suppliers || []).find((s: any) => s.id === feltoltesSupplierId);
 
         return (
           <div className="modal-overlay" onClick={() => setShowRaktarFeltoltesModal(false)}>

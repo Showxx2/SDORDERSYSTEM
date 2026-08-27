@@ -16,8 +16,8 @@
 
   /* Design System Tokens */
   --bg-gradient: radial-gradient(circle at 50% 50%, #1c1c1e 0%, #000000 100%);
-  --panel-bg: rgba(28, 28, 30, 0.7);
-  --panel-bg-hover: rgba(44, 44, 46, 0.8);
+  --panel-bg: rgba(24, 24, 26, 0.92);
+  --panel-bg-hover: rgba(38, 38, 40, 0.94);
   --glass-bg: rgba(255, 255, 255, 0.04);
   --glass-bg-hover: rgba(255, 255, 255, 0.08);
   --glass-border: rgba(255, 255, 255, 0.08);
@@ -1080,7 +1080,7 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.78);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   display: flex;

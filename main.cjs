@@ -90,7 +90,20 @@ function initDatabase() {
       deliveryFees: {
         baseFee: 500,
         perKmFee: 100
-      }
+      },
+      suppliers: [
+        { id: "SUPP-1", name: "Zala-Hús Kft.", address: "Zalaegerszeg, Hock János u. 42.", description: "Húsáru beszállító", is_active: true },
+        { id: "SUPP-2", name: "Metro Nagykereskedés", address: "Keszthely, Hévízi út 5.", description: "Általános alapanyagok", is_active: true },
+        { id: "SUPP-3", name: "Zöldség Depó", address: "Teskánd, Petőfi u. 12.", description: "Friss zöldségek beszállítója", is_active: true }
+      ],
+      inventoryCategories: [
+        { id: 1, name: "Húsáru", description: "Friss és fagyasztott húsok", is_active: true },
+        { id: 2, name: "Zöldség / Gyümölcs", description: "Friss zöldségek és gyümölcsök", is_active: true },
+        { id: 3, name: "Szárazáru / Konzerv", description: "Lisztek, tészták, konzervek", is_active: true },
+        { id: 4, name: "Tejtermék", description: "Tej, sajtok, tejföl, tejszín", is_active: true }
+      ],
+      invoice_aliases: [],
+      inventoryFills: []
     };
     fs.writeFileSync(dbPath, JSON.stringify(defaultData, null, 2), 'utf-8');
   }
@@ -127,6 +140,37 @@ function loadDatabase() {
         { id: 'CUST-1019', name: 'Gulyás Miklós', phone_prefix: '+36', phone_number: '703335599', zip: '8868', city: 'Letenye', street: 'Kossuth utca', house_number: '67', details: '', points: 125, is_problematic: false },
         { id: 'CUST-1020', name: 'Mészáros Éva', phone_prefix: '+36', phone_number: '309990011', zip: '8749', city: 'Zalakaros', street: 'Petőfi utca', house_number: '14', details: 'Mindig korán kéri', points: 160, is_problematic: false }
       ];
+      fs.writeFileSync(dbPath, JSON.stringify(parsed, null, 2), 'utf-8');
+    }
+
+    // Schema migration: add default suppliers and inventory categories if missing
+    let migrated = false;
+    if (!parsed.suppliers) {
+      parsed.suppliers = [
+        { id: "SUPP-1", name: "Zala-Hús Kft.", address: "Zalaegerszeg, Hock János u. 42.", description: "Húsáru beszállító", is_active: true },
+        { id: "SUPP-2", name: "Metro Nagykereskedés", address: "Keszthely, Hévízi út 5.", description: "Általános alapanyagok", is_active: true },
+        { id: "SUPP-3", name: "Zöldség Depó", address: "Teskánd, Petőfi u. 12.", description: "Friss zöldségek beszállítója", is_active: true }
+      ];
+      migrated = true;
+    }
+    if (!parsed.inventoryCategories) {
+      parsed.inventoryCategories = [
+        { id: 1, name: "Húsáru", description: "Friss és fagyasztott húsok", is_active: true },
+        { id: 2, name: "Zöldség / Gyümölcs", description: "Friss zöldségek és gyümölcsök", is_active: true },
+        { id: 3, name: "Szárazáru / Konzerv", description: "Lisztek, tészták, konzervek", is_active: true },
+        { id: 4, name: "Tejtermék", description: "Tej, sajtok, tejföl, tejszín", is_active: true }
+      ];
+      migrated = true;
+    }
+    if (!parsed.invoice_aliases) {
+      parsed.invoice_aliases = [];
+      migrated = true;
+    }
+    if (!parsed.inventoryFills) {
+      parsed.inventoryFills = [];
+      migrated = true;
+    }
+    if (migrated) {
       fs.writeFileSync(dbPath, JSON.stringify(parsed, null, 2), 'utf-8');
     }
     
