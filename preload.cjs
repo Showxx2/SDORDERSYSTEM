@@ -5,5 +5,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   dbSave: (data) => ipcRenderer.invoke('db-save', data),
   getPrinters: () => ipcRenderer.invoke('get-printers'),
   printReceipt: (htmlContent, printerName, silentParam) => ipcRenderer.invoke('print-receipt', htmlContent, printerName, silentParam),
-  parseInvoicePdf: (filePath) => ipcRenderer.invoke('parse-invoice-pdf', filePath)
+  parseInvoicePdf: (pdfData) => ipcRenderer.invoke('parse-invoice-pdf', pdfData)
 });

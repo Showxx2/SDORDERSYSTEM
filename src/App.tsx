@@ -12646,64 +12646,77 @@ export default function App() {
         const activeInventory = db.inventory ? db.inventory.filter((i: any) => i.is_active !== false) : [];
 
 // Handle actual PDF processing and matching
-        const processInvoicePdf = async (filePath: string, fileName: string) => {
-          setFeltoltesUploadedFileName(fileName);
+        const readAndProcessPdf = (file: File) => {
+          setFeltoltesUploadedFileName(file.name);
           setIsAnalyzingInvoice(true);
           setAnalysisSuccess(false);
           setAnalysisProgress(10);
           setAnalysisStep('Fájl beolvasása...');
 
-          if (!window.electronAPI?.parseInvoicePdf) {
-            alert("Az offline PDF-olvasó nem elérhető ebben a környezetben.");
-            setIsAnalyzingInvoice(false);
-            return;
-          }
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            try {
+              const arrayBuffer = e.target?.result as ArrayBuffer;
+              const uint8Array = new Uint8Array(arrayBuffer);
 
-          try {
-            setAnalysisProgress(35);
-            setAnalysisStep('PDF szöveg kinyerése folyamatban...');
-            const result = await window.electronAPI.parseInvoicePdf(filePath);
-            
-            if (!result.success || !result.text) {
-              throw new Error(result.error || "Nem sikerült szöveget kinyerni a PDF-ből. Győződj meg róla, hogy nem üres vagy védett a fájl.");
-            }
+              setAnalysisProgress(35);
+              setAnalysisStep('PDF szöveg kinyerése folyamatban...');
 
-            setAnalysisProgress(70);
-            setAnalysisStep('Tételek felismerése és párosítása...');
-            
-            const rawText = result.text;
-            setFeltoltesRawText(rawText);
-            
-            const aliases = db.invoice_aliases || [];
-            const inventory = db.inventory || [];
-            
-            const parsedItems = parsePdfTextToItems(rawText, inventory, aliases);
-            
-            if (parsedItems.length === 0) {
-              throw new Error("A számlán nem találtunk felismerhető tételeket. Ellenőrizd a számla formátumát!");
-            }
-            
-            setPdfItems(parsedItems);
-            
-            const initialList = parsedItems
-              .filter(item => item.matched_item_id !== null)
-              .map(item => ({
-                inventory_item_id: item.matched_item_id as number,
-                name: (db.inventory.find((i: any) => i.id === item.matched_item_id)?.name) || item.raw_name,
-                quantity: item.quantity,
-                unit: item.unit || 'kg'
-              }));
+              if (!window.electronAPI?.parseInvoicePdf) {
+                throw new Error("Az offline PDF-olvasó nem elérhető ebben a környezetben.");
+              }
+
+              const result = await window.electronAPI.parseInvoicePdf(uint8Array);
               
-            setFeltoltesItemsList(initialList);
-            setAnalysisProgress(100);
-            setIsAnalyzingInvoice(false);
-            setAnalysisSuccess(true);
-          } catch (error: any) {
-            console.error(error);
-            alert(`Sikertelen számlaelemzés: ${error.message || "Ismeretlen hiba"}`);
+              if (!result.success || !result.text) {
+                throw new Error(result.error || "Nem sikerült szöveget kinyerni a PDF-ből. Győződj meg róla, hogy digitális számla PDF-et töltesz fel!");
+              }
+
+              setAnalysisProgress(70);
+              setAnalysisStep('Tételek felismerése és párosítása...');
+              
+              const rawText = result.text;
+              setFeltoltesRawText(rawText);
+              
+              const aliases = db.invoice_aliases || [];
+              const inventory = db.inventory || [];
+              
+              const parsedItems = parsePdfTextToItems(rawText, inventory, aliases);
+              
+              if (parsedItems.length === 0) {
+                throw new Error("A számlán nem találtunk felismerhető tételeket. Ellenőrizd a számla formátumát!");
+              }
+              
+              setPdfItems(parsedItems);
+              
+              const initialList = parsedItems
+                .filter(item => item.matched_item_id !== null)
+                .map(item => ({
+                  inventory_item_id: item.matched_item_id as number,
+                  name: (db.inventory.find((i: any) => i.id === item.matched_item_id)?.name) || item.raw_name,
+                  quantity: item.quantity,
+                  unit: item.unit || 'kg'
+                }));
+                
+              setFeltoltesItemsList(initialList);
+              setAnalysisProgress(100);
+              setIsAnalyzingInvoice(false);
+              setAnalysisSuccess(true);
+            } catch (error: any) {
+              console.error(error);
+              alert(`Sikertelen számlaelemzés: ${error.message || "Ismeretlen hiba"}`);
+              setIsAnalyzingInvoice(false);
+              setFeltoltesUploadedFileName(null);
+            }
+          };
+
+          reader.onerror = () => {
+            alert("Hiba történt a fájl helyi beolvasása során.");
             setIsAnalyzingInvoice(false);
             setFeltoltesUploadedFileName(null);
-          }
+          };
+
+          reader.readAsArrayBuffer(file);
         };
 
         const handleMatchChange = (pdfItemId: number, newMatchedId: number | null) => {
@@ -12778,19 +12791,18 @@ export default function App() {
           setShowFeltoltesSuccessCard(true);
         };
 
-
         const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
           e.preventDefault();
           const file = e.dataTransfer.files?.[0];
           if (file) {
-            processInvoicePdf((file as any).path || file.name, file.name);
+            readAndProcessPdf(file);
           }
         };
 
         const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
           const file = e.target.files?.[0];
           if (file) {
-            processInvoicePdf((file as any).path || file.name, file.name);
+            readAndProcessPdf(file);
           }
         };
 

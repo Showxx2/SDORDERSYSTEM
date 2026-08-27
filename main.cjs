@@ -292,12 +292,20 @@ ipcMain.handle('db-save', async (event, data) => {
   return saveDatabase(data);
 });
 
-ipcMain.handle('parse-invoice-pdf', async (event, filePath) => {
+ipcMain.handle('parse-invoice-pdf', async (event, pdfData) => {
   try {
-    if (!fs.existsSync(filePath)) {
-      throw new Error(`File not found: ${filePath}`);
+    let dataBuffer;
+    if (typeof pdfData === 'string') {
+      if (!fs.existsSync(pdfData)) {
+        throw new Error(`File not found: ${pdfData}`);
+      }
+      dataBuffer = fs.readFileSync(pdfData);
+    } else if (pdfData && (Buffer.isBuffer(pdfData) || pdfData instanceof Uint8Array || (typeof pdfData === 'object' && pdfData.buffer))) {
+      // In case Electron IPC wraps it as typed array or Node Buffer
+      dataBuffer = Buffer.from(pdfData.buffer || pdfData);
+    } else {
+      throw new Error("Invalid PDF data type received.");
     }
-    const dataBuffer = fs.readFileSync(filePath);
     const parsedData = await pdfParse(dataBuffer);
     return { success: true, text: parsedData.text };
   } catch (error) {
