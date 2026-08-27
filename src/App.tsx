@@ -1002,6 +1002,76 @@ export default function App() {
   const [supplierAddress, setSupplierAddress] = useState('');
   const [supplierDescription, setSupplierDescription] = useState('');
 
+  const [pdfItems, setPdfItems] = useState<Array<{ id: number; raw_name: string; quantity: number; unit: string; matched_item_id: number | null }>>([]);
+  const [feltoltesRawText, setFeltoltesRawText] = useState<string>('');
+
+  const parsePdfTextToItems = (text: string, inventory: any[], aliases: any[]) => {
+    const lines = text.split('\n');
+    const itemsList: Array<{ id: number; raw_name: string; quantity: number; unit: string; matched_item_id: number | null }> = [];
+    let idCounter = 1;
+
+    const itemRegex = /(.+?)\s+(\d+(?:[.,]\d+)?)\s*(db|kg|g|l|liter|üveg|csomag|karton|szál|pohár)\b/i;
+
+    for (let line of lines) {
+      line = line.trim();
+      if (!line) continue;
+
+      const lowerLine = line.toLowerCase();
+      if (lowerLine.includes('összesen') || lowerLine.includes('végösszeg') || lowerLine.includes('nettó') || lowerLine.includes('bruttó') || lowerLine.includes('áfa')) {
+        continue;
+      }
+
+      const match = line.match(itemRegex);
+      if (match) {
+        const rawName = match[1].trim();
+        const qtyStr = match[2].replace(',', '.');
+        const quantity = parseFloat(qtyStr);
+        const unit = match[3].toLowerCase();
+
+        let cleanName = rawName.replace(/^\d+[\s\.\)-]+/, '').trim();
+        
+        if (cleanName.length < 2 || /^\d+$/.test(cleanName)) {
+          continue;
+        }
+
+        const isDuplicate = itemsList.some(item => item.raw_name === cleanName && item.quantity === quantity);
+        if (isDuplicate) continue;
+
+        let matchedId: number | null = null;
+        
+        const aliasObj = (aliases || []).find(a => a.raw_name.toLowerCase() === cleanName.toLowerCase());
+        if (aliasObj) {
+          matchedId = aliasObj.inventory_item_id;
+        } else {
+          const exactInv = (inventory || []).find(inv => inv.name.toLowerCase() === cleanName.toLowerCase() && inv.is_active !== false);
+          if (exactInv) {
+            matchedId = exactInv.id;
+          } else {
+            const fuzzyInv = (inventory || []).find(inv => {
+              if (inv.is_active === false) return false;
+              const invLower = inv.name.toLowerCase();
+              const cleanLower = cleanName.toLowerCase();
+              return cleanLower.includes(invLower) || invLower.includes(cleanLower);
+            });
+            if (fuzzyInv) {
+              matchedId = fuzzyInv.id;
+            }
+          }
+        }
+
+        itemsList.push({
+          id: idCounter++,
+          raw_name: cleanName,
+          quantity,
+          unit,
+          matched_item_id: matchedId
+        });
+      }
+    }
+
+    return itemsList;
+  };
+
   // Raktár Feltöltés (Beszállítás) States
   const [showRaktarFeltoltesModal, setShowRaktarFeltoltesModal] = useState(false);
   const [feltoltesSupplierId, setFeltoltesSupplierId] = useState('');
@@ -12414,107 +12484,85 @@ export default function App() {
         const activeSuppliers = db.suppliers ? db.suppliers.filter((s: any) => s.is_active !== false) : [];
         const activeInventory = db.inventory ? db.inventory.filter((i: any) => i.is_active !== false) : [];
 
-        // Handle file drop/upload simulation
-        const simulateInvoiceAnalysis = (fileName: string) => {
+// Handle actual PDF processing and matching
+        const processInvoicePdf = async (filePath: string, fileName: string) => {
           setFeltoltesUploadedFileName(fileName);
           setIsAnalyzingInvoice(true);
           setAnalysisSuccess(false);
-          setAnalysisProgress(0);
-          setAnalysisStep('Fájl feltöltése és dekódolása...');
+          setAnalysisProgress(10);
+          setAnalysisStep('Fájl beolvasása...');
 
-          let currentProgress = 0;
-          const interval = setInterval(() => {
-            currentProgress += 5;
-            setAnalysisProgress(currentProgress);
+          if (!window.electronAPI?.parseInvoicePdf) {
+            alert("Az offline PDF-olvasó nem elérhető ebben a környezetben.");
+            setIsAnalyzingInvoice(false);
+            return;
+          }
+
+          try {
+            setAnalysisProgress(35);
+            setAnalysisStep('PDF szöveg kinyerése folyamatban...');
+            const result = await window.electronAPI.parseInvoicePdf(filePath);
             
-            if (currentProgress === 20) {
-              setAnalysisStep('Karakterfelismerés (OCR) folyamatban...');
-            } else if (currentProgress === 50) {
-              setAnalysisStep('AI adatelemzés és entitás-kinyerés...');
-            } else if (currentProgress === 80) {
-              setAnalysisStep('Raktárcikkek párosítása az adatbázissal...');
-            } else if (currentProgress >= 100) {
-              clearInterval(interval);
-              setIsAnalyzingInvoice(false);
-              setAnalysisSuccess(true);
-
-              // Mock recognition data from active inventory
-              const recognized: any[] = [];
-              if (activeInventory.length > 0) {
-                // Find or default to flour/liszt
-                const item1 = activeInventory.find((i: any) => i.name.toLowerCase().includes('liszt')) || activeInventory[0];
-                recognized.push({
-                  inventory_item_id: item1.id,
-                  name: item1.name,
-                  quantity: 25,
-                  unit: item1.unit || 'kg'
-                });
-              }
-              if (activeInventory.length > 1) {
-                // Find or default to tomato/paradicsom
-                const item2 = activeInventory.find((i: any) => i.name.toLowerCase().includes('paradicsom') || i.name.toLowerCase().includes('szósz')) || activeInventory[1];
-                recognized.push({
-                  inventory_item_id: item2.id,
-                  name: item2.name,
-                  quantity: 12,
-                  unit: item2.unit || 'kg'
-                });
-              }
-              if (activeInventory.length > 2) {
-                // Find or default to cheese/sajt
-                const item3 = activeInventory.find((i: any) => i.name.toLowerCase().includes('sajt') || i.name.toLowerCase().includes('mozzarella')) || activeInventory[2];
-                recognized.push({
-                  inventory_item_id: item3.id,
-                  name: item3.name,
-                  quantity: 15,
-                  unit: item3.unit || 'kg'
-                });
-              }
-              setFeltoltesItemsList(recognized);
+            if (!result.success || !result.text) {
+              throw new Error(result.error || "Nem sikerült szöveget kinyerni a PDF-ből. Győződj meg róla, hogy nem üres vagy védett a fájl.");
             }
-          }, 100);
-        };
 
-        const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
-          e.preventDefault();
-          const file = e.dataTransfer.files?.[0];
-          if (file) {
-            simulateInvoiceAnalysis(file.name);
+            setAnalysisProgress(70);
+            setAnalysisStep('Tételek felismerése és párosítása...');
+            
+            const rawText = result.text;
+            setFeltoltesRawText(rawText);
+            
+            const aliases = db.invoice_aliases || [];
+            const inventory = db.inventory || [];
+            
+            const parsedItems = parsePdfTextToItems(rawText, inventory, aliases);
+            
+            if (parsedItems.length === 0) {
+              throw new Error("A számlán nem találtunk felismerhető tételeket. Ellenőrizd a számla formátumát!");
+            }
+            
+            setPdfItems(parsedItems);
+            
+            const initialList = parsedItems
+              .filter(item => item.matched_item_id !== null)
+              .map(item => ({
+                inventory_item_id: item.matched_item_id as number,
+                name: (db.inventory.find((i: any) => i.id === item.matched_item_id)?.name) || item.raw_name,
+                quantity: item.quantity,
+                unit: item.unit || 'kg'
+              }));
+              
+            setFeltoltesItemsList(initialList);
+            setAnalysisProgress(100);
+            setIsAnalyzingInvoice(false);
+            setAnalysisSuccess(true);
+          } catch (error: any) {
+            console.error(error);
+            alert(`Sikertelen számlaelemzés: ${error.message || "Ismeretlen hiba"}`);
+            setIsAnalyzingInvoice(false);
+            setFeltoltesUploadedFileName(null);
           }
         };
 
-        const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-          const file = e.target.files?.[0];
-          if (file) {
-            simulateInvoiceAnalysis(file.name);
-          }
-        };
+        const handleMatchChange = (pdfItemId: number, newMatchedId: number | null) => {
+          const updatedPdfItems = pdfItems.map(item => {
+            if (item.id === pdfItemId) {
+              return { ...item, matched_item_id: newMatchedId };
+            }
+            return item;
+          });
+          setPdfItems(updatedPdfItems);
 
-        const handleAddItemManually = () => {
-          if (!feltoltesSelectedItem) return;
-          if (feltoltesAddQty <= 0) return;
-
-          // Check if already in current invoice items list
-          const exists = feltoltesItemsList.some(item => item.inventory_item_id === feltoltesSelectedItem.id);
-          if (exists) {
-            setFeltoltesItemsList(prev => prev.map(item => 
-              item.inventory_item_id === feltoltesSelectedItem.id 
-                ? { ...item, quantity: item.quantity + feltoltesAddQty }
-                : item
-            ));
-          } else {
-            setFeltoltesItemsList(prev => [...prev, {
-              inventory_item_id: feltoltesSelectedItem.id,
-              name: feltoltesSelectedItem.name,
-              quantity: feltoltesAddQty,
-              unit: feltoltesSelectedItem.unit || 'kg'
-            }]);
-          }
-
-          // Reset inputs
-          setFeltoltesSelectedItem(null);
-          setFeltoltesSearchQuery('');
-          setFeltoltesAddQty(0);
+          const newList = updatedPdfItems
+            .filter(item => item.matched_item_id !== null)
+            .map(item => ({
+              inventory_item_id: item.matched_item_id as number,
+              name: (db.inventory.find((i: any) => i.id === item.matched_item_id)?.name) || item.raw_name,
+              quantity: item.quantity,
+              unit: item.unit || 'kg'
+            }));
+          setFeltoltesItemsList(newList);
         };
 
         const executeFeltoltes = () => {
@@ -12533,7 +12581,6 @@ export default function App() {
             return inv;
           });
 
-          // Log delivery transaction
           const fillLog = {
             id: db.inventoryFills ? db.inventoryFills.length + 1 : 1,
             invoice_number: feltoltesInvoiceNum || `INV-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -12544,14 +12591,71 @@ export default function App() {
             items: feltoltesItemsList
           };
 
+          const newAliases = [...(db.invoice_aliases || [])];
+          pdfItems.forEach(item => {
+            if (item.matched_item_id !== null) {
+              const exists = newAliases.some(a => a.raw_name.toLowerCase() === item.raw_name.toLowerCase());
+              if (!exists) {
+                const nextId = newAliases.length > 0 ? Math.max(...newAliases.map(a => a.id)) + 1 : 1;
+                newAliases.push({
+                  id: nextId,
+                  raw_name: item.raw_name,
+                  inventory_item_id: item.matched_item_id
+                });
+              }
+            }
+          });
+
           const updatedDb = {
             ...db,
             inventory: updatedInventory,
-            inventoryFills: [...(db.inventoryFills || []), fillLog]
+            inventoryFills: [...(db.inventoryFills || []), fillLog],
+            invoice_aliases: newAliases
           };
 
           saveDatabase(updatedDb);
           setShowFeltoltesSuccessCard(true);
+        };
+
+
+        const handleFileDrop = (e: React.DragEvent<HTMLDivElement>) => {
+          e.preventDefault();
+          const file = e.dataTransfer.files?.[0];
+          if (file) {
+            processInvoicePdf((file as any).path || file.name, file.name);
+          }
+        };
+
+        const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+          const file = e.target.files?.[0];
+          if (file) {
+            processInvoicePdf((file as any).path || file.name, file.name);
+          }
+        };
+
+        const handleAddItemManually = () => {
+          if (!feltoltesSelectedItem) return;
+          if (feltoltesAddQty <= 0) return;
+
+          const exists = feltoltesItemsList.some(item => item.inventory_item_id === feltoltesSelectedItem.id);
+          if (exists) {
+            setFeltoltesItemsList(prev => prev.map(item => 
+              item.inventory_item_id === feltoltesSelectedItem.id 
+                ? { ...item, quantity: item.quantity + feltoltesAddQty }
+                : item
+            ));
+          } else {
+            setFeltoltesItemsList(prev => [...prev, {
+              inventory_item_id: feltoltesSelectedItem.id,
+              name: feltoltesSelectedItem.name,
+              quantity: feltoltesAddQty,
+              unit: feltoltesSelectedItem.unit || 'kg'
+            }]);
+          }
+
+          setFeltoltesSelectedItem(null);
+          setFeltoltesSearchQuery('');
+          setFeltoltesAddQty(0);
         };
 
         // Filter items for autocomplete search
@@ -12929,101 +13033,116 @@ export default function App() {
 
                       {/* Case 3: Scan Complete splitscreen */}
                       {analysisSuccess && (
-                        <div style={{ display: 'grid', gridTemplateColumns: '4.5fr 5.5fr', gap: '20px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '4fr 6fr', gap: '20px' }}>
                           
-                          {/* Scanned invoice preview on Left */}
+                          {/* Scanned invoice raw text on Left */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Beolvasott számla képe</span>
-                            <div style={{ background: '#ffffff', color: '#1c1c1e', borderRadius: '12px', padding: '20px', boxShadow: '0 8px 30px rgba(0,0,0,0.5)', fontFamily: 'Courier New, monospace', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '8px', minHeight: '320px', position: 'relative', overflow: 'hidden' }}>
-                              
-                              {/* PAID diagonal green stamp */}
-                              <div style={{ position: 'absolute', top: '24px', right: '16px', border: '3px solid #30d158', borderRadius: '4px', padding: '6px 12px', color: '#30d158', fontWeight: 800, fontSize: '16px', transform: 'rotate(12deg)', textTransform: 'uppercase', opacity: 0.85, letterSpacing: '2px' }}>
-                                Feldolgozva
-                              </div>
-
-                              <div style={{ borderBottom: '1px dashed #1c1c1e', paddingBottom: '8px', textAlign: 'center' }}>
-                                <strong style={{ fontSize: '14px', letterSpacing: '1px' }}>SZÁMLA / INVOICE</strong>
-                                <div style={{ fontSize: '9px', marginTop: '2px' }}>{selectedSupplier?.name || 'Partner cég kft.'}</div>
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                                <div>Számlaszám: {feltoltesInvoiceNum || 'INV-2026-0428'}</div>
-                                <div>Dátum: {new Date().toLocaleDateString('hu-HU')}</div>
-                                <div>Beszállító: {selectedSupplier?.name || 'Szállító partner'}</div>
-                              </div>
-                              
-                              <div style={{ borderTop: '1px dashed #1c1c1e', borderBottom: '1px dashed #1c1c1e', padding: '8px 0', margin: '6px 0', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-                                  <span>Tétel</span>
-                                  <span>Menny.</span>
-                                </div>
-                                {feltoltesItemsList.map((item, idx) => (
-                                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <span>{item.name}</span>
-                                    <span>{item.quantity} {item.unit}</span>
-                                  </div>
-                                ))}
-                              </div>
-
-                              <div style={{ textAlign: 'right', fontWeight: 700, fontSize: '12px' }}>
-                                NETTÓ ÖSSZESEN: {(feltoltesItemsList.reduce((sum, item) => sum + (item.quantity * 850), 0)).toLocaleString()} FT
-                              </div>
-                              <div style={{ textAlign: 'right', fontSize: '10px' }}>
-                                ÁFA (27%): {(feltoltesItemsList.reduce((sum, item) => sum + (item.quantity * 850 * 0.27), 0)).toLocaleString()} FT
-                              </div>
-                              <div style={{ textAlign: 'right', fontWeight: 700, fontSize: '13px', borderTop: '1px solid #1c1c1e', paddingTop: '4px' }}>
-                                BRUTTÓ VÉGÖSSZEG: {(feltoltesItemsList.reduce((sum, item) => sum + (item.quantity * 850 * 1.27), 0)).toLocaleString()} FT
-                              </div>
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Beolvasott számla nyers szövege</span>
+                            <div style={{
+                              background: '#1c1c1e',
+                              color: '#a1a1a6',
+                              borderRadius: '12px',
+                              padding: '16px',
+                              border: '1px solid rgba(255,255,255,0.05)',
+                              fontFamily: 'Courier New, monospace',
+                              fontSize: '11px',
+                              height: '350px',
+                              overflowY: 'auto',
+                              whiteSpace: 'pre-wrap',
+                              userSelect: 'text'
+                            }}>
+                              {feltoltesRawText || 'Nem található olvasható szöveg a PDF-ben.'}
                             </div>
                           </div>
 
-                          {/* Scanned items editor list on Right */}
+                          {/* Scanned items matching editor list on Right */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Felismert tételek jóváhagyása</span>
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>Felismert tételek párosítása és jóváhagyása</span>
                             
-                            <div className="table-container" style={{ border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', maxHeight: '280px', overflowY: 'auto' }}>
+                            <div className="table-container" style={{ border: '1px solid rgba(255,255,255,0.05)', borderRadius: '10px', maxHeight: '290px', overflowY: 'auto' }}>
                               <table className="admin-table" style={{ fontSize: '12px' }}>
                                 <thead>
                                   <tr>
-                                    <th>Cikk</th>
-                                    <th>Mennyiség módosítása</th>
-                                    <th style={{ textAlign: 'right' }}>Művelet</th>
+                                    <th style={{ width: '40%' }}>Számla cikk név</th>
+                                    <th style={{ width: '35%' }}>Raktári cikk összekötés</th>
+                                    <th style={{ width: '25%', textAlign: 'right' }}>Mennyiség</th>
+                                    <th style={{ width: '5%', textAlign: 'right' }}></th>
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {feltoltesItemsList.map((item, idx) => (
-                                    <tr key={idx}>
-                                      <td style={{ fontWeight: 600 }}>{item.name}</td>
+                                  {pdfItems.map((item) => (
+                                    <tr key={item.id}>
                                       <td>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                          <span style={{ fontWeight: 600, color: 'white', fontSize: '12px' }}>{item.raw_name}</span>
+                                          <span style={{ fontSize: '10px', color: item.matched_item_id ? '#30d158' : '#ff9f0a', fontWeight: 500 }}>
+                                            {item.matched_item_id ? '✓ Automatikus pár' : '⚠️ Nincs párosítva'}
+                                          </span>
+                                        </div>
+                                      </td>
+                                      <td>
+                                        <select
+                                          className="input-field"
+                                          style={{
+                                            height: '28px',
+                                            fontSize: '11px',
+                                            padding: '0 4px',
+                                            background: 'rgba(0,0,0,0.4)',
+                                            color: 'white',
+                                            border: '1px solid rgba(255,255,255,0.1)',
+                                            borderRadius: '6px',
+                                            width: '100%',
+                                            outline: 'none'
+                                          }}
+                                          value={item.matched_item_id || ''}
+                                          onChange={e => {
+                                            const val = e.target.value;
+                                            handleMatchChange(item.id, val === '' ? null : Number(val));
+                                          }}
+                                        >
+                                          <option value="">-- Válassz cikket --</option>
+                                          {db.inventory.filter((inv: any) => inv.is_active !== false).map((inv: any) => (
+                                            <option key={inv.id} value={inv.id}>{inv.name} ({inv.unit})</option>
+                                          ))}
+                                        </select>
+                                      </td>
+                                      <td>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end' }}>
                                           <input 
                                             type="number" 
                                             className="input-field" 
                                             value={item.quantity}
-                                            style={{ width: '80px', height: '28px', padding: '2px 6px', fontSize: '12px', textAlign: 'center' }}
+                                            style={{ width: '60px', height: '28px', padding: '2px', fontSize: '11px', textAlign: 'center', borderRadius: '4px' }}
                                             onChange={e => {
                                               const val = parseFloat(e.target.value) || 0;
-                                              setFeltoltesItemsList(prev => prev.map((item, i) => 
-                                                i === idx ? { ...item, quantity: val } : item
+                                              setPdfItems(prev => prev.map(p => p.id === item.id ? { ...p, quantity: val } : p));
+                                              setFeltoltesItemsList(prev => prev.map(p => 
+                                                p.inventory_item_id === item.matched_item_id ? { ...p, quantity: val } : p
                                               ));
                                             }}
                                           />
-                                          <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{item.unit}</span>
+                                          <span style={{ color: 'var(--text-secondary)', fontSize: '11px', minWidth: '20px' }}>{item.unit}</span>
                                         </div>
                                       </td>
                                       <td style={{ textAlign: 'right' }}>
                                         <button 
-                                          style={{ background: 'transparent', border: 'none', color: '#ff453a', cursor: 'pointer', padding: 0 }}
-                                          onClick={() => setFeltoltesItemsList(prev => prev.filter((_, i) => i !== idx))}
+                                          style={{ background: 'transparent', border: 'none', color: '#ff453a', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                          onClick={() => {
+                                            setPdfItems(prev => prev.filter(p => p.id !== item.id));
+                                            if (item.matched_item_id) {
+                                              setFeltoltesItemsList(prev => prev.filter(p => p.inventory_item_id !== item.matched_item_id));
+                                            }
+                                          }}
                                         >
-                                          <Trash2 size={14} />
+                                          <Trash2 size={12} />
                                         </button>
                                       </td>
                                     </tr>
                                   ))}
-                                  {feltoltesItemsList.length === 0 && (
+                                  {pdfItems.length === 0 && (
                                     <tr>
-                                      <td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic', padding: '24px' }}>
-                                        A számláról nem sikerült tételeket beolvasni, vagy mindegyiket eltávolítottad.
+                                      <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', fontStyle: 'italic', padding: '24px' }}>
+                                        Nem találtunk feldolgozható tételeket.
                                       </td>
                                     </tr>
                                   )}
@@ -13042,6 +13161,8 @@ export default function App() {
                                 onClick={() => {
                                   setFeltoltesUploadedFileName(null);
                                   setFeltoltesItemsList([]);
+                                  setPdfItems([]);
+                                  setFeltoltesRawText('');
                                   setAnalysisSuccess(false);
                                 }}
                               >
@@ -13052,6 +13173,7 @@ export default function App() {
 
                         </div>
                       )}
+
 
                     </div>
                   )}

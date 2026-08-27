@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const pdfParse = require('pdf-parse');
 
 let mainWindow;
 let server = null;
@@ -289,6 +290,20 @@ ipcMain.handle('db-load', async () => {
 
 ipcMain.handle('db-save', async (event, data) => {
   return saveDatabase(data);
+});
+
+ipcMain.handle('parse-invoice-pdf', async (event, filePath) => {
+  try {
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`File not found: ${filePath}`);
+    }
+    const dataBuffer = fs.readFileSync(filePath);
+    const parsedData = await pdfParse(dataBuffer);
+    return { success: true, text: parsedData.text };
+  } catch (error) {
+    console.error('Error parsing PDF:', error);
+    return { success: false, error: error.message };
+  }
 });
 
 ipcMain.handle('get-printers', async () => {
