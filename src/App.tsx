@@ -12731,7 +12731,51 @@ export default function App() {
               
               const rawText = result.text;
               setFeltoltesRawText(rawText);
-              
+
+              // 1. Detect Supplier / Partner
+              const cleanSupplierName = (name: string) => {
+                return name
+                  .toLowerCase()
+                  .replace(/[\.\,\-\/]/g, ' ')
+                  .replace(/\b(kft|bt|zrt|nyrt|kft\.|bt\.|zrt\.)\b/g, '')
+                  .trim();
+              };
+
+              const matchedSupplier = db.suppliers.find((s: any) => {
+                if (s.is_active === false) return false;
+                const cleanS = cleanSupplierName(s.name);
+                const cleanTxt = rawText.toLowerCase();
+                return cleanS.length >= 3 && cleanTxt.includes(cleanS);
+              });
+
+              if (matchedSupplier) {
+                setFeltoltesSupplierId(String(matchedSupplier.id));
+              }
+
+              // 2. Detect Invoice Number / Bizonylatszám
+              const invoiceNumRegexes = [
+                /\b(?:számlaszám|bizonylatszám|sorszám|számla száma|számla sorszáma|számlaazonosító|számla azonosító|sz\.\s*szám|számla\s*sz\.|invoice\s*no\.?|invoice\s*number)\b\s*[:\-\.]?\s*([a-zA-Z0-9\-\/_\(\)]+)/i,
+                /\b(?:sz\b\s*[:\-\.]?\s*([a-zA-Z0-9\-\/_\(\)]{5,}))/i
+              ];
+
+              let foundInvoiceNum = '';
+              for (const regex of invoiceNumRegexes) {
+                const match = rawText.match(regex);
+                if (match && match[1]) {
+                  let potentialNum = match[1].trim();
+                  // Remove trailing punctuation
+                  potentialNum = potentialNum.replace(/[.,:;\-\/]+$/, '').trim();
+                  if (potentialNum.length >= 4 && potentialNum.length <= 30 && !/^(kft|kft\.|zrt|bt|oldal|lap|dátum)$/i.test(potentialNum)) {
+                    foundInvoiceNum = potentialNum;
+                    break;
+                  }
+                }
+              }
+
+              if (foundInvoiceNum) {
+                setFeltoltesInvoiceNum(foundInvoiceNum);
+              }
+
               const aliases = db.invoice_aliases || [];
               const inventory = db.inventory || [];
               
