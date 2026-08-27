@@ -5483,7 +5483,7 @@ export default function App() {
                         <div style={{
                           flex: 1,
                           minHeight: 0,
-                          overflowY: 'auto',
+                          overflow: 'visible',
                           paddingRight: '4px'
                         }}>
                           
@@ -6144,7 +6144,7 @@ export default function App() {
                         <div style={{
                           flex: 1,
                           minHeight: 0,
-                          overflowY: 'auto',
+                          overflow: 'visible',
                           paddingRight: '4px'
                         }}>
                           
