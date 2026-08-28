@@ -2763,8 +2763,8 @@ export default function App() {
           body {
             font-family: 'Courier New', Courier, monospace;
             width: 72mm;
-            margin: 0;
-            padding: 4mm 3mm 4mm 6mm;
+            margin: 0 auto;
+            padding: 4mm 4mm 4mm 4mm;
             font-size: ${fSize};
             line-height: ${lSpacing};
             color: #000;
