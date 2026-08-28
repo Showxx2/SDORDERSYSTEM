@@ -2082,6 +2082,7 @@ export default function App() {
     saveDatabase(updatedDb);
 
     // 4. Reset states & go back to menu
+    setIsClosingDayAnimationActive(false);
     setShowDailyCloseModal(false);
     setView('menu');
   };
