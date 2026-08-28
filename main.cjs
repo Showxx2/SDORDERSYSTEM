@@ -428,8 +428,8 @@ ipcMain.handle('print-receipt', async (event, htmlContent, printerName, silentPa
               console.error(`Nyomtatási kísérlet ${attemptNum} sikertelen:`, failureReason);
               
               if (attemptNum === 1) {
-                // Kísérlet 2: printBackground kikapcsolása (sok monokróm/hőpapír nyomtató ezt nem szereti)
-                console.log("Második kísérlet (printBackground: false)...");
+                // Kísérlet 2: Próbálkozás margómentes nyomtatással
+                console.log("Második kísérlet (printBackground: false, marginType: none)...");
                 tryPrint({
                   silent: isSilent,
                   printBackground: false,
@@ -444,32 +444,26 @@ ipcMain.handle('print-receipt', async (event, htmlContent, printerName, silentPa
                   }
                 }, 2);
               } else if (attemptNum === 2) {
-                // Kísérlet 3: Minimális beállítások
+                // Kísérlet 3: Minimális beállítások alapértelmezett margókkal
                 console.log("Harmadik kísérlet (minimális beállítások)...");
                 tryPrint({
                   silent: isSilent,
+                  printBackground: false,
                   deviceName: printerName || undefined,
-                  marginType: 'none',
+                  marginType: 'default',
                   margins: {
-                    marginType: 'none',
-                    top: 0,
-                    bottom: 0,
-                    left: 0,
-                    right: 0
+                    marginType: 'default'
                   }
                 }, 3);
               } else if (attemptNum === 3 && printerName) {
-                // Kísérlet 4: Próbáljuk meg az alapértelmezett nyomtatóra küldeni, ha az egyedi név hibás volt
+                // Kísérlet 4: Próbáljuk meg az alapértelmezett nyomtatóra küldeni
                 console.log("Negyedik kísérlet (alapértelmezett nyomtató)...");
                 tryPrint({
                   silent: isSilent,
-                  marginType: 'none',
+                  printBackground: false,
+                  marginType: 'default',
                   margins: {
-                    marginType: 'none',
-                    top: 0,
-                    bottom: 0,
-                    left: 0,
-                    right: 0
+                    marginType: 'default'
                   }
                 }, 4);
               } else {
@@ -481,20 +475,16 @@ ipcMain.handle('print-receipt', async (event, htmlContent, printerName, silentPa
           });
         };
 
-        // Első kísérlet - 350ms késleltetés, hogy a Chromium kirajzolási/elrendezési szála végezzen,
-        // így a nyomtató nem egy 0 magasságú üres lapot kap.
+        // Első kísérlet - megegyezik a nem-csendes párbeszédablak alapbeállításaival:
+        // kikapcsolt háttérgrafika (printBackground: false) és alapértelmezett illesztőprogram-margók (marginType: default).
         setTimeout(() => {
           tryPrint({
             silent: isSilent,
-            printBackground: true,
+            printBackground: false,
             deviceName: printerName || undefined,
-            marginType: 'none',
+            marginType: 'default',
             margins: {
-              marginType: 'none',
-              top: 0,
-              bottom: 0,
-              left: 0,
-              right: 0
+              marginType: 'default'
             }
           }, 1);
         }, 350);
