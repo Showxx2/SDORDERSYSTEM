@@ -381,8 +381,21 @@ ipcMain.handle('get-printers', async () => {
 
 ipcMain.handle('print-receipt', async (event, htmlContent, printerName, silentParam) => {
   const isSilent = silentParam !== false;
+  const tempPath = path.join(app.getPath('temp'), `receipt_${Date.now()}.html`);
+  
   return new Promise((resolve) => {
     try {
+      // Adunk neki egy szép, tisztességes címet a nyomtatási sorhoz,
+      // ezáltal a Windows spooler nem a teljes kódolt data-URI-t kapja meg (ami lefagyasztja a Metapace/Epson meghajtókat)
+      let parsedHtml = htmlContent;
+      if (parsedHtml.includes('<head>')) {
+        parsedHtml = parsedHtml.replace('<head>', '<head><title>Blokk</title>');
+      } else {
+        parsedHtml = parsedHtml.replace('<html>', '<html><head><title>Blokk</title></head>');
+      }
+
+      fs.writeFileSync(tempPath, parsedHtml, 'utf-8');
+
       let workerWindow = new BrowserWindow({
         show: false,
         webPreferences: {
@@ -391,13 +404,25 @@ ipcMain.handle('print-receipt', async (event, htmlContent, printerName, silentPa
         }
       });
       
-      workerWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+      workerWindow.loadFile(tempPath);
       
       workerWindow.webContents.on('did-finish-load', () => {
         const tryPrint = (options, attemptNum) => {
           workerWindow.webContents.print(options, (success, failureReason) => {
+            // Takarítás a nyomtatás végeztével
+            const cleanTempFile = () => {
+              try {
+                if (fs.existsSync(tempPath)) {
+                  fs.unlinkSync(tempPath);
+                }
+              } catch (e) {
+                console.error("Nem sikerült törölni az átmeneti fájlt:", e);
+              }
+            };
+
             if (success) {
               workerWindow.close();
+              cleanTempFile();
               resolve({ success: true });
             } else {
               console.error(`Nyomtatási kísérlet ${attemptNum} sikertelen:`, failureReason);
@@ -449,6 +474,7 @@ ipcMain.handle('print-receipt', async (event, htmlContent, printerName, silentPa
                 }, 4);
               } else {
                 workerWindow.close();
+                cleanTempFile();
                 resolve({ success: false, error: failureReason });
               }
             }
@@ -475,6 +501,11 @@ ipcMain.handle('print-receipt', async (event, htmlContent, printerName, silentPa
       });
     } catch (err) {
       console.error("Nyomtatási hiba:", err);
+      try {
+        if (fs.existsSync(tempPath)) {
+          fs.unlinkSync(tempPath);
+        }
+      } catch (e) {}
       resolve({ success: false, error: err.message });
     }
   });
