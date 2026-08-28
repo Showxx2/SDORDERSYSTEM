@@ -865,6 +865,14 @@ function BrutalClosingAnimation({ onComplete }: { onComplete: () => void }) {
 // Geocoding cache to save API credits and speed up queries
 const geocodeCache: { [address: string]: [number, number] } = {};
 
+const getOrderDisplayId = (id: string | number) => {
+  const idStr = String(id);
+  if (idStr.startsWith('archived-')) {
+    return idStr.split('-')[1];
+  }
+  return idStr;
+};
+
 export default function App() {
   // App States
   const [currentUser, setCurrentUser] = useState<UserItem | null>(null);
@@ -2075,8 +2083,11 @@ export default function App() {
         maxIdleTimeText
       };
 
-      // 2. Archive all current orders (set archived: true)
-      const archivedOrders = (db.orders || []).map((o: any) => ({ ...o, archived: true }));
+      // 2. Archive all current orders (set archived: true and make ID unique to prevent tomorrow's active order ID conflict)
+      const archivedOrders = (db.orders || []).map((o: any) => {
+        if (o.archived) return o;
+        return { ...o, archived: true, id: `archived-${o.id}-${Date.now()}` };
+      });
 
       // 3. Save to database
       const updatedCloses = [...(db.dailyCloses || []), newCloseReport];
@@ -2091,7 +2102,10 @@ export default function App() {
       console.error("Napi zárás véglegesítési hiba:", err);
       // Fallback: Still archive current orders if possible to trigger a fresh day
       try {
-        const archivedOrders = (db.orders || []).map((o: any) => ({ ...o, archived: true }));
+        const archivedOrders = (db.orders || []).map((o: any) => {
+          if (o.archived) return o;
+          return { ...o, archived: true, id: `archived-${o.id}-${Date.now()}` };
+        });
         saveDatabase({ ...db, orders: archivedOrders });
       } catch (e) {
         console.error("Zárás mentési hiba (fallback):", e);
@@ -2597,7 +2611,7 @@ export default function App() {
 
     const renderMetadataBlock = (omitOrderId = false) => {
       return `
-        ${(activeConfig.showOrderId && !omitOrderId) ? `<div><span class="bold">Nyugtaszám:</span> #${order.id}</div>` : ''}
+        ${(activeConfig.showOrderId && !omitOrderId) ? `<div><span class="bold">Nyugtaszám:</span> #${getOrderDisplayId(order.id)}</div>` : ''}
         ${activeConfig.showTimestamp ? `<div><span class="bold">Dátum:</span> ${dateStr}</div>` : ''}
         <div><span class="bold">Kiszolgáló:</span> ${order.created_by_user || 'Rendszer'}</div>
       `;
@@ -2750,7 +2764,7 @@ export default function App() {
         <div class="text-center bold" style="font-size: 130%; border: 3px solid #000; padding: 6px; margin-bottom: 8px; text-transform: uppercase;">⚠️ KONYHAI BLOKK ⚠️</div>
         ${activeConfig.showOrderId ? `
           <div class="text-center bold" style="font-size: 170%; border: 2px dashed #000; padding: 6px 0; margin-bottom: 8px;">
-            NYUGTASZÁM: #${order.id}
+            NYUGTASZÁM: #${getOrderDisplayId(order.id)}
           </div>
         ` : ''}
         ${renderMetadataBlock(true)}
@@ -2877,7 +2891,10 @@ export default function App() {
     }
 
     const newOrder: Order = {
-      id: db.orders.length > 0 ? Math.max(...db.orders.map((o: any) => o.id)) + 1 : 1,
+      id: (() => {
+        const activeOrders = (db.orders || []).filter((o: any) => !o.archived);
+        return activeOrders.length > 0 ? Math.max(...activeOrders.map((o: any) => o.id)) + 1 : 1;
+      })(),
       customer_id: selectedCartCustomerId,
       customer_name: customerName || 'Névtelen Ügyfél',
       customer_address: customerAddress || 'Helyben fogyasztás',
@@ -3134,7 +3151,10 @@ export default function App() {
       // Let's create this order directly in the database!
       const finalPrice = (pizzaItem.price + pizzaItem.packaging_fee) * qty;
       const chatbotOrder: Order = {
-        id: db.orders.length > 0 ? Math.max(...db.orders.map((o: any) => o.id)) + 1 : 1,
+        id: (() => {
+          const activeOrders = (db.orders || []).filter((o: any) => !o.archived);
+          return activeOrders.length > 0 ? Math.max(...activeOrders.map((o: any) => o.id)) + 1 : 1;
+        })(),
         customer_name: 'Chatbot Megrendelő',
         customer_address: address,
         payment_method: payMethod,
@@ -10419,7 +10439,7 @@ export default function App() {
                       <tbody>
                         {allCompletedOrders.map((o: Order) => (
                           <tr key={o.id}>
-                            <td style={{ fontWeight: 600 }}>#{o.id}</td>
+                            <td style={{ fontWeight: 600 }}>#{getOrderDisplayId(o.id)}</td>
                             <td>{new Date(o.created_at).toLocaleString('hu-HU')}</td>
                             <td>{o.customer_name}</td>
                             <td>{o.customer_address}</td>
