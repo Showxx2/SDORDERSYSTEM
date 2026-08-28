@@ -2762,9 +2762,9 @@ export default function App() {
           * { box-sizing: border-box; }
           body {
             font-family: 'Courier New', Courier, monospace;
-            width: 100%;
+            width: 68mm;
             margin: 0;
-            padding: 4mm 2mm 4mm 2mm;
+            padding: 4mm 4mm 4mm 2mm;
             font-size: ${fSize};
             line-height: ${lSpacing};
             color: #000;
