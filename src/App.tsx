@@ -2577,9 +2577,9 @@ export default function App() {
       `;
     };
 
-    const renderMetadataBlock = () => {
+    const renderMetadataBlock = (omitOrderId = false) => {
       return `
-        ${activeConfig.showOrderId ? `<div><span class="bold">Nyugtaszám:</span> #${order.id}</div>` : ''}
+        ${(activeConfig.showOrderId && !omitOrderId) ? `<div><span class="bold">Nyugtaszám:</span> #${order.id}</div>` : ''}
         ${activeConfig.showTimestamp ? `<div><span class="bold">Dátum:</span> ${dateStr}</div>` : ''}
         <div><span class="bold">Kiszolgáló:</span> ${order.created_by_user || 'Rendszer'}</div>
       `;
@@ -2730,7 +2730,12 @@ export default function App() {
     } else if (layout === 'kitchen') {
       innerBodyHtml = `
         <div class="text-center bold" style="font-size: 130%; border: 3px solid #000; padding: 6px; margin-bottom: 8px; text-transform: uppercase;">⚠️ KONYHAI BLOKK ⚠️</div>
-        ${renderMetadataBlock()}
+        ${activeConfig.showOrderId ? `
+          <div class="text-center bold" style="font-size: 170%; border: 2px dashed #000; padding: 6px 0; margin-bottom: 8px;">
+            NYUGTASZÁM: #${order.id}
+          </div>
+        ` : ''}
+        ${renderMetadataBlock(true)}
         ${renderCustomerBlock()}
         <div class="divider"></div>
         ${renderItemsBlock()}
