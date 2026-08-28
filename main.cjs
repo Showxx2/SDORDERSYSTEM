@@ -431,10 +431,11 @@ ipcMain.handle('print-receipt', async (event, htmlContent, printerName, silentPa
               
               if (attemptNum === 1) {
                 // Kísérlet 2: Próbálkozás margómentes nyomtatással
-                console.log("Második kísérlet (printBackground: false, marginType: none)...");
+                console.log("Második kísérlet (printBackground: false, marginType: none, color: false)...");
                 tryPrint({
                   silent: isSilent,
                   printBackground: false,
+                  color: false,
                   deviceName: printerName || undefined,
                   marginType: 'none',
                   margins: {
@@ -451,6 +452,7 @@ ipcMain.handle('print-receipt', async (event, htmlContent, printerName, silentPa
                 tryPrint({
                   silent: isSilent,
                   printBackground: false,
+                  color: false,
                   deviceName: printerName || undefined,
                   marginType: 'default',
                   margins: {
@@ -463,6 +465,7 @@ ipcMain.handle('print-receipt', async (event, htmlContent, printerName, silentPa
                 tryPrint({
                   silent: isSilent,
                   printBackground: false,
+                  color: false,
                   marginType: 'default',
                   margins: {
                     marginType: 'default'
@@ -477,12 +480,13 @@ ipcMain.handle('print-receipt', async (event, htmlContent, printerName, silentPa
           });
         };
 
-        // Első kísérlet - a beállított 300px széles viewporton margók nélkül (marginType: none) és
-        // háttérgrafika nélkül (printBackground: false) küldjük el a nyomtatást.
+        // Első kísérlet - a beállított 300px széles viewporton margók nélkül (marginType: none),
+        // háttérgrafika nélkül (printBackground: false) és egyszínű módban (color: false) küldjük el.
         setTimeout(() => {
           tryPrint({
             silent: isSilent,
             printBackground: false,
+            color: false,
             deviceName: printerName || undefined,
             marginType: 'none',
             margins: {
