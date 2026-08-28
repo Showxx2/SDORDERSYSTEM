@@ -1961,131 +1961,142 @@ export default function App() {
   };
 
   const finalizeDailyClose = () => {
-    // 1. Gather all today's stats
-    const activeDayOrders = (db.orders || []).filter((o: any) => !o.archived);
-    const completedOrdersToday = activeDayOrders.filter((o: any) => o.status === 'completed');
-    const grossRevenue = completedOrdersToday.reduce((sum: number, o: any) => sum + o.total_amount, 0);
-    const netRevenue = Math.round(grossRevenue / 1.27);
-    const orderCount = completedOrdersToday.length;
+    try {
+      // 1. Gather all today's stats
+      const activeDayOrders = (db.orders || []).filter((o: any) => !o.archived);
+      const completedOrdersToday = activeDayOrders.filter((o: any) => o.status === 'completed');
+      const grossRevenue = completedOrdersToday.reduce((sum: number, o: any) => sum + o.total_amount, 0);
+      const netRevenue = Math.round(grossRevenue / 1.27);
+      const orderCount = completedOrdersToday.length;
 
-    // Get sold items
-    const itemsSoldMap: { [key: string]: number } = {};
-    completedOrdersToday.forEach((o: any) => {
-      (o.items || []).forEach((item: any) => {
-        itemsSoldMap[item.name] = (itemsSoldMap[item.name] || 0) + item.quantity;
+      // Get sold items
+      const itemsSoldMap: { [key: string]: number } = {};
+      completedOrdersToday.forEach((o: any) => {
+        (o.items || []).forEach((item: any) => {
+          itemsSoldMap[item.name] = (itemsSoldMap[item.name] || 0) + item.quantity;
+        });
       });
-    });
-    const itemsSold = Object.keys(itemsSoldMap).map(name => ({ name, quantity: itemsSoldMap[name] }));
+      const itemsSold = Object.keys(itemsSoldMap).map(name => ({ name, quantity: itemsSoldMap[name] }));
 
-    // Get sold packaging
-    const packagingSoldMap: { [key: string]: number } = {};
-    completedOrdersToday.forEach((o: any) => {
-      (o.items || []).forEach((item: any) => {
-        const menuItem = db.items.find((mi: any) => mi.id === item.item_id);
-        const packType = menuItem?.packaging_type || 'none';
-        const displayName = packType === 'pizza' ? 'Pizza doboz' : packType === 'box' ? 'Elviteles doboz' : packType === 'cup' ? 'Pohár' : 'Nincs csomagolás';
-        packagingSoldMap[displayName] = (packagingSoldMap[displayName] || 0) + item.quantity;
+      // Get sold packaging
+      const packagingSoldMap: { [key: string]: number } = {};
+      completedOrdersToday.forEach((o: any) => {
+        (o.items || []).forEach((item: any) => {
+          const menuItem = (db.items || []).find((mi: any) => mi.id === item.item_id);
+          const packType = menuItem?.packaging_type || 'none';
+          const displayName = packType === 'pizza' ? 'Pizza doboz' : packType === 'box' ? 'Elviteles doboz' : packType === 'cup' ? 'Pohár' : 'Nincs csomagolás';
+          packagingSoldMap[displayName] = (packagingSoldMap[displayName] || 0) + item.quantity;
+        });
       });
-    });
-    const packagingSold = Object.keys(packagingSoldMap).map(name => ({ name, quantity: packagingSoldMap[name] }));
+      const packagingSold = Object.keys(packagingSoldMap).map(name => ({ name, quantity: packagingSoldMap[name] }));
 
-    // Get deliveries
-    const deliveriesMap: { [key: string]: number } = {};
-    completedOrdersToday.forEach((o: any) => {
-      const city = getCityFromAddress(o.customer_address);
-      deliveriesMap[city] = (deliveriesMap[city] || 0) + 1;
-    });
-    const deliveries = Object.keys(deliveriesMap).map(city => ({ city, count: deliveriesMap[city] }));
+      // Get deliveries
+      const deliveriesMap: { [key: string]: number } = {};
+      completedOrdersToday.forEach((o: any) => {
+        const city = getCityFromAddress(o.customer_address);
+        deliveriesMap[city] = (deliveriesMap[city] || 0) + 1;
+      });
+      const deliveries = Object.keys(deliveriesMap).map(city => ({ city, count: deliveriesMap[city] }));
 
-    // Get payments
-    const paymentsMap: { [key: string]: number } = {};
-    completedOrdersToday.forEach((o: any) => {
-      paymentsMap[o.payment_method] = (paymentsMap[o.payment_method] || 0) + o.total_amount;
-    });
-    const payments = Object.keys(paymentsMap).map(method => ({ method, total: paymentsMap[method] }));
+      // Get payments
+      const paymentsMap: { [key: string]: number } = {};
+      completedOrdersToday.forEach((o: any) => {
+        paymentsMap[o.payment_method] = (paymentsMap[o.payment_method] || 0) + o.total_amount;
+      });
+      const payments = Object.keys(paymentsMap).map(method => ({ method, total: paymentsMap[method] }));
 
-    // Get users performance
-    const usersPerformanceMap: { [key: string]: number } = {};
-    completedOrdersToday.forEach((o: any) => {
-      const user = o.created_by_user || 'Rendszer';
-      usersPerformanceMap[user] = (usersPerformanceMap[user] || 0) + 1;
-    });
-    const usersPerformance = Object.keys(usersPerformanceMap).map(name => ({ name, count: usersPerformanceMap[name] }));
+      // Get users performance
+      const usersPerformanceMap: { [key: string]: number } = {};
+      completedOrdersToday.forEach((o: any) => {
+        const user = o.created_by_user || 'Rendszer';
+        usersPerformanceMap[user] = (usersPerformanceMap[user] || 0) + 1;
+      });
+      const usersPerformance = Object.keys(usersPerformanceMap).map(name => ({ name, count: usersPerformanceMap[name] }));
 
-    // Average order gap and idle times
-    const sorted = [...completedOrdersToday].sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-    let averageOrderGapMin = 0;
-    if (sorted.length > 1) {
-      let totalDiffMs = 0;
-      for (let i = 1; i < sorted.length; i++) {
-        totalDiffMs += new Date(sorted[i].created_at).getTime() - new Date(sorted[i - 1].created_at).getTime();
+      // Average order gap and idle times
+      const sorted = [...completedOrdersToday].sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      let averageOrderGapMin = 0;
+      if (sorted.length > 1) {
+        let totalDiffMs = 0;
+        for (let i = 1; i < sorted.length; i++) {
+          totalDiffMs += new Date(sorted[i].created_at).getTime() - new Date(sorted[i - 1].created_at).getTime();
+        }
+        averageOrderGapMin = Math.round((totalDiffMs / (sorted.length - 1)) / 60000);
       }
-      averageOrderGapMin = Math.round((totalDiffMs / (sorted.length - 1)) / 60000);
-    }
 
-    let maxIdleTimeText = 'N/A';
-    if (sorted.length > 1) {
-      let maxGapMs = 0;
-      let maxStart = '';
-      let maxEnd = '';
-      for (let i = 1; i < sorted.length; i++) {
-        const start = new Date(sorted[i - 1].created_at);
-        const end = new Date(sorted[i].created_at);
-        const diff = end.getTime() - start.getTime();
-        if (diff > maxGapMs) {
-          maxGapMs = diff;
-          maxStart = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          maxEnd = end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      let maxIdleTimeText = 'N/A';
+      if (sorted.length > 1) {
+        let maxGapMs = 0;
+        let maxStart = '';
+        let maxEnd = '';
+        for (let i = 1; i < sorted.length; i++) {
+          const start = new Date(sorted[i - 1].created_at);
+          const end = new Date(sorted[i].created_at);
+          const diff = end.getTime() - start.getTime();
+          if (diff > maxGapMs) {
+            maxGapMs = diff;
+            maxStart = start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            maxEnd = end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          }
+        }
+        const gapMin = Math.round(maxGapMs / 60000);
+        if (gapMin > 0) {
+          maxIdleTimeText = `${maxStart} - ${maxEnd} (${gapMin} perc)`;
         }
       }
-      const gapMin = Math.round(maxGapMs / 60000);
-      if (gapMin > 0) {
-        maxIdleTimeText = `${maxStart} - ${maxEnd} (${gapMin} perc)`;
+
+      const firstOrderTime = sorted.length > 0 
+        ? new Date(sorted[0].created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : null;
+
+      const closeIndex = ((db.dailyCloses || []).length || 0) + 1;
+      
+      const newCloseReport = {
+        id: closeIndex,
+        date: new Date().toLocaleDateString('hu-HU'),
+        closeTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        closeIndex,
+        grossRevenue,
+        netRevenue,
+        orderCount,
+        startupTime: startupTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        firstOrderTime,
+        itemsSold,
+        packagingSold,
+        deliveries,
+        payments,
+        usersPerformance,
+        averageOrderGapMin,
+        maxIdleTimeText
+      };
+
+      // 2. Archive all current orders (set archived: true)
+      const archivedOrders = (db.orders || []).map((o: any) => ({ ...o, archived: true }));
+
+      // 3. Save to database
+      const updatedCloses = [...(db.dailyCloses || []), newCloseReport];
+      const updatedDb = {
+        ...db,
+        orders: archivedOrders,
+        dailyCloses: updatedCloses
+      };
+
+      saveDatabase(updatedDb);
+    } catch (err) {
+      console.error("Napi zárás véglegesítési hiba:", err);
+      // Fallback: Still archive current orders if possible to trigger a fresh day
+      try {
+        const archivedOrders = (db.orders || []).map((o: any) => ({ ...o, archived: true }));
+        saveDatabase({ ...db, orders: archivedOrders });
+      } catch (e) {
+        console.error("Zárás mentési hiba (fallback):", e);
       }
+    } finally {
+      // 4. Reset states & go back to menu - ALWAYS execute!
+      setIsClosingDayAnimationActive(false);
+      setShowDailyCloseModal(false);
+      setView('menu');
     }
-
-    const firstOrderTime = sorted.length > 0 
-      ? new Date(sorted[0].created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      : null;
-
-    const closeIndex = (db.dailyCloses?.length || 0) + 1;
-    
-    const newCloseReport = {
-      id: closeIndex,
-      date: new Date().toLocaleDateString('hu-HU'),
-      closeTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      closeIndex,
-      grossRevenue,
-      netRevenue,
-      orderCount,
-      startupTime: startupTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      firstOrderTime,
-      itemsSold,
-      packagingSold,
-      deliveries,
-      payments,
-      usersPerformance,
-      averageOrderGapMin,
-      maxIdleTimeText
-    };
-
-    // 2. Archive all current orders (set archived: true)
-    const archivedOrders = (db.orders || []).map((o: any) => ({ ...o, archived: true }));
-
-    // 3. Save to database
-    const updatedCloses = [...(db.dailyCloses || []), newCloseReport];
-    const updatedDb = {
-      ...db,
-      orders: archivedOrders,
-      dailyCloses: updatedCloses
-    };
-
-    saveDatabase(updatedDb);
-
-    // 4. Reset states & go back to menu
-    setIsClosingDayAnimationActive(false);
-    setShowDailyCloseModal(false);
-    setView('menu');
   };
 
   const getDeliveryFeeForAddress = async (address: string): Promise<number> => {
