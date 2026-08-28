@@ -408,20 +408,44 @@ ipcMain.handle('print-receipt', async (event, htmlContent, printerName, silentPa
                 tryPrint({
                   silent: isSilent,
                   printBackground: false,
-                  deviceName: printerName || undefined
+                  deviceName: printerName || undefined,
+                  marginType: 'none',
+                  margins: {
+                    marginType: 'none',
+                    top: 0,
+                    bottom: 0,
+                    left: 0,
+                    right: 0
+                  }
                 }, 2);
               } else if (attemptNum === 2) {
                 // Kísérlet 3: Minimális beállítások
                 console.log("Harmadik kísérlet (minimális beállítások)...");
                 tryPrint({
                   silent: isSilent,
-                  deviceName: printerName || undefined
+                  deviceName: printerName || undefined,
+                  marginType: 'none',
+                  margins: {
+                    marginType: 'none',
+                    top: 0,
+                    bottom: 0,
+                    left: 0,
+                    right: 0
+                  }
                 }, 3);
               } else if (attemptNum === 3 && printerName) {
                 // Kísérlet 4: Próbáljuk meg az alapértelmezett nyomtatóra küldeni, ha az egyedi név hibás volt
                 console.log("Negyedik kísérlet (alapértelmezett nyomtató)...");
                 tryPrint({
-                  silent: isSilent
+                  silent: isSilent,
+                  marginType: 'none',
+                  margins: {
+                    marginType: 'none',
+                    top: 0,
+                    bottom: 0,
+                    left: 0,
+                    right: 0
+                  }
                 }, 4);
               } else {
                 workerWindow.close();
@@ -431,12 +455,23 @@ ipcMain.handle('print-receipt', async (event, htmlContent, printerName, silentPa
           });
         };
 
-        // Első kísérlet
-        tryPrint({
-          silent: isSilent,
-          printBackground: true,
-          deviceName: printerName || undefined
-        }, 1);
+        // Első kísérlet - 350ms késleltetés, hogy a Chromium kirajzolási/elrendezési szála végezzen,
+        // így a nyomtató nem egy 0 magasságú üres lapot kap.
+        setTimeout(() => {
+          tryPrint({
+            silent: isSilent,
+            printBackground: true,
+            deviceName: printerName || undefined,
+            marginType: 'none',
+            margins: {
+              marginType: 'none',
+              top: 0,
+              bottom: 0,
+              left: 0,
+              right: 0
+            }
+          }, 1);
+        }, 350);
       });
     } catch (err) {
       console.error("Nyomtatási hiba:", err);
