@@ -397,6 +397,8 @@ ipcMain.handle('print-receipt', async (event, htmlContent, printerName, silentPa
       fs.writeFileSync(tempPath, parsedHtml, 'utf-8');
 
       let workerWindow = new BrowserWindow({
+        width: 300,
+        height: 1200,
         show: false,
         webPreferences: {
           nodeIntegration: false,
@@ -475,16 +477,20 @@ ipcMain.handle('print-receipt', async (event, htmlContent, printerName, silentPa
           });
         };
 
-        // Első kísérlet - megegyezik a nem-csendes párbeszédablak alapbeállításaival:
-        // kikapcsolt háttérgrafika (printBackground: false) és alapértelmezett illesztőprogram-margók (marginType: default).
+        // Első kísérlet - a beállított 300px széles viewporton margók nélkül (marginType: none) és
+        // háttérgrafika nélkül (printBackground: false) küldjük el a nyomtatást.
         setTimeout(() => {
           tryPrint({
             silent: isSilent,
             printBackground: false,
             deviceName: printerName || undefined,
-            marginType: 'default',
+            marginType: 'none',
             margins: {
-              marginType: 'default'
+              marginType: 'none',
+              top: 0,
+              bottom: 0,
+              left: 0,
+              right: 0
             }
           }, 1);
         }, 350);
