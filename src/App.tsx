@@ -722,6 +722,11 @@ function getItemCurrentPricing(item: MenuItem, categories: Category[], date: Dat
 
 function BrutalClosingAnimation({ onComplete }: { onComplete: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const onCompleteRef = useRef(onComplete);
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -820,14 +825,14 @@ function BrutalClosingAnimation({ onComplete }: { onComplete: () => void }) {
 
     const timer = setTimeout(() => {
       cancelAnimationFrame(animationId);
-      onComplete();
+      onCompleteRef.current();
     }, 4000);
 
     return () => {
       cancelAnimationFrame(animationId);
       clearTimeout(timer);
     };
-  }, [onComplete]);
+  }, []);
 
   return (
     <div className="brutal-closing-overlay">
