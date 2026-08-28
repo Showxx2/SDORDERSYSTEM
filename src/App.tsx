@@ -821,7 +821,7 @@ function BrutalClosingAnimation({ onComplete }: { onComplete: () => void }) {
     const timer = setTimeout(() => {
       cancelAnimationFrame(animationId);
       onComplete();
-    }, 4500);
+    }, 4000);
 
     return () => {
       cancelAnimationFrame(animationId);
@@ -1952,6 +1952,7 @@ export default function App() {
   };
 
   const getCityFromAddress = (addr: string) => {
+    if (!addr || typeof addr !== 'string') return 'Egyéb / Kiszállítás';
     const lowerAddr = addr.toLowerCase();
     const matchedCity = Object.values(ZALA_ZIP_MAP).find(c => lowerAddr.includes(c.toLowerCase()));
     if (matchedCity) return matchedCity;
@@ -1961,7 +1962,7 @@ export default function App() {
 
   const finalizeDailyClose = () => {
     // 1. Gather all today's stats
-    const activeDayOrders = db.orders.filter((o: any) => !o.archived);
+    const activeDayOrders = (db.orders || []).filter((o: any) => !o.archived);
     const completedOrdersToday = activeDayOrders.filter((o: any) => o.status === 'completed');
     const grossRevenue = completedOrdersToday.reduce((sum: number, o: any) => sum + o.total_amount, 0);
     const netRevenue = Math.round(grossRevenue / 1.27);
@@ -1970,7 +1971,7 @@ export default function App() {
     // Get sold items
     const itemsSoldMap: { [key: string]: number } = {};
     completedOrdersToday.forEach((o: any) => {
-      o.items.forEach((item: any) => {
+      (o.items || []).forEach((item: any) => {
         itemsSoldMap[item.name] = (itemsSoldMap[item.name] || 0) + item.quantity;
       });
     });
@@ -1979,7 +1980,7 @@ export default function App() {
     // Get sold packaging
     const packagingSoldMap: { [key: string]: number } = {};
     completedOrdersToday.forEach((o: any) => {
-      o.items.forEach((item: any) => {
+      (o.items || []).forEach((item: any) => {
         const menuItem = db.items.find((mi: any) => mi.id === item.item_id);
         const packType = menuItem?.packaging_type || 'none';
         const displayName = packType === 'pizza' ? 'Pizza doboz' : packType === 'box' ? 'Elviteles doboz' : packType === 'cup' ? 'Pohár' : 'Nincs csomagolás';
@@ -2069,7 +2070,7 @@ export default function App() {
     };
 
     // 2. Archive all current orders (set archived: true)
-    const archivedOrders = db.orders.map((o: any) => ({ ...o, archived: true }));
+    const archivedOrders = (db.orders || []).map((o: any) => ({ ...o, archived: true }));
 
     // 3. Save to database
     const updatedCloses = [...(db.dailyCloses || []), newCloseReport];
