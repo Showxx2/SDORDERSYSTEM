@@ -436,7 +436,8 @@ ipcMain.handle('print-receipt', async (event, htmlContent, printerName, silentPa
                   silent: isSilent,
                   printBackground: false,
                   color: false,
-                  deviceName: printerName || undefined
+                  deviceName: printerName || undefined,
+                  usePrinterDefaultPageSize: true
                 }, 2);
               } else if (attemptNum === 2) {
                 // Kísérlet 3: Margómentes nyomtatás próbája
@@ -446,6 +447,7 @@ ipcMain.handle('print-receipt', async (event, htmlContent, printerName, silentPa
                   printBackground: false,
                   color: false,
                   deviceName: printerName || undefined,
+                  usePrinterDefaultPageSize: true,
                   marginType: 'none',
                   margins: {
                     marginType: 'none',
@@ -462,6 +464,7 @@ ipcMain.handle('print-receipt', async (event, htmlContent, printerName, silentPa
                   silent: isSilent,
                   printBackground: false,
                   color: false,
+                  usePrinterDefaultPageSize: true,
                   marginType: 'default',
                   margins: {
                     marginType: 'default'
@@ -477,13 +480,15 @@ ipcMain.handle('print-receipt', async (event, htmlContent, printerName, silentPa
         };
 
         // Első kísérlet - megegyezik a működő nyomtatási párbeszédpanel beállításaival:
-        // 300px széles viewport, kikapcsolt háttérgrafika, egyszínű mód és az alapértelmezett meghajtó-margók (marginType: default).
+        // 300px széles viewport, kikapcsolt háttérgrafika, egyszínű mód, az alapértelmezett meghajtó-margók (marginType: default)
+        // és a nyomtató saját alapértelmezett papírmérete (usePrinterDefaultPageSize: true).
         setTimeout(() => {
           tryPrint({
             silent: isSilent,
             printBackground: false,
             color: false,
             deviceName: printerName || undefined,
+            usePrinterDefaultPageSize: true,
             marginType: 'default',
             margins: {
               marginType: 'default'
