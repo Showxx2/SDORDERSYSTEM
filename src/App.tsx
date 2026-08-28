@@ -9343,9 +9343,9 @@ export default function App() {
                                 </div>
                               ) : null;
 
-                              const previewMetadata = (
+                              const renderPreviewMetadata = (omitOrderId = false) => (
                                 <>
-                                  {config.showOrderId && <div><strong>Nyugtaszám:</strong> #1234</div>}
+                                  {config.showOrderId && !omitOrderId && <div><strong>Nyugtaszám:</strong> #1234</div>}
                                   {config.showTimestamp && <div><strong>Dátum:</strong> {new Date().toLocaleString('hu-HU')}</div>}
                                   <div><strong>Kiszolgáló:</strong> Rendszergazda</div>
                                 </>
@@ -9475,7 +9475,7 @@ export default function App() {
                                     {config.logoPosition === 'top' && previewLogo}
                                     {previewHeader}
                                     {config.logoPosition === 'before_items' && previewLogo}
-                                    {previewMetadata}
+                                    {renderPreviewMetadata()}
                                     <div style={{ borderTop: '1px dashed #000000', margin: '8px 0' }}></div>
                                     {previewItems}
                                     <div style={{ borderTop: '1px dashed #000000', margin: '8px 0' }}></div>
@@ -9489,7 +9489,12 @@ export default function App() {
                                 return (
                                   <>
                                     <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '120%', border: '2px solid #000', padding: '4px', marginBottom: '8px' }}>⚠️ KONYHAI BLOKK ⚠️</div>
-                                    {previewMetadata}
+                                    {config.showOrderId && (
+                                      <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '150%', border: '2px dashed #000', padding: '6px 0', marginBottom: '8px' }}>
+                                        NYUGTASZÁM: #1234
+                                      </div>
+                                    )}
+                                    {renderPreviewMetadata(true)}
                                     {previewCustomer}
                                     <div style={{ borderTop: '1px dashed #000000', margin: '8px 0' }}></div>
                                     {previewItems}
@@ -9504,7 +9509,7 @@ export default function App() {
                                     {previewHeader}
                                     {config.logoPosition === 'before_items' && previewLogo}
                                     <div style={{ borderTop: '1px dashed #000000', margin: '8px 0' }}></div>
-                                    {previewMetadata}
+                                    {renderPreviewMetadata()}
                                     <div style={{ borderTop: '1px dashed #000000', margin: '8px 0' }}></div>
                                     {previewItems}
                                     <div style={{ borderTop: '1px dashed #000000', margin: '8px 0' }}></div>
