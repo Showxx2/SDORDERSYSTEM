@@ -2352,13 +2352,31 @@ export default function App() {
     setIsPaymentViewActive(false);
   };
 
+  // Helper to check if a cart item is unmodified (normal/default item)
+  const isUnmodifiedCartItem = (i: OrderItem, attachment: MenuItem | null) => {
+    if (i.custom_modifications?.is_menu_order) return false;
+    if (i.custom_modifications) {
+      if (i.custom_modifications.portion !== 'full') return false;
+      if (i.custom_modifications.note && i.custom_modifications.note.trim() !== '') return false;
+      if (i.custom_modifications.extra_price && i.custom_modifications.extra_price !== 0) return false;
+
+      const itemAttachmentId = i.custom_modifications.linked_item?.item_id || null;
+      const newAttachmentId = attachment?.id || null;
+      if (itemAttachmentId !== newAttachmentId) return false;
+
+      const adjustments = i.custom_modifications.ingredient_adjustments || {};
+      const hasNonNormalIngredient = Object.values(adjustments).some(val => val !== 'normal');
+      if (hasNonNormalIngredient) return false;
+    }
+    return true;
+  };
+
   // Add Item to Cart Immediately (with optional attachment)
   const addToCartImmediately = (item: MenuItem, attachment: MenuItem | null) => {
     setCart(prev => {
       const existing = prev.find(i => 
         i.item_id === item.id && 
-        ((!i.custom_modifications?.linked_item && !attachment) || 
-         (i.custom_modifications?.linked_item?.item_id === attachment?.id))
+        isUnmodifiedCartItem(i, attachment)
       );
       
       const itemPricing = getItemCurrentPricing(item, db.categories);
@@ -2372,9 +2390,7 @@ export default function App() {
 
       if (existing) {
         return prev.map(i => 
-          (i.item_id === item.id && 
-           ((!i.custom_modifications?.linked_item && !attachment) || 
-            (i.custom_modifications?.linked_item?.item_id === attachment?.id)))
+          i === existing
           ? { ...i, quantity: i.quantity + 1 } 
           : i
         );
@@ -2508,13 +2524,13 @@ export default function App() {
   };
 
   // Remove Item from Cart
-  const removeFromCart = (itemId: number) => {
+  const removeFromCart = (targetItem: OrderItem) => {
     setCart(prev => {
-      const existing = prev.find(i => i.item_id === itemId);
+      const existing = prev.find(i => i === targetItem);
       if (existing && existing.quantity > 1) {
-        return prev.map(i => i.item_id === itemId ? { ...i, quantity: i.quantity - 1 } : i);
+        return prev.map(i => i === targetItem ? { ...i, quantity: i.quantity - 1 } : i);
       }
-      return prev.filter(i => i.item_id !== itemId);
+      return prev.filter(i => i !== targetItem);
     });
   };
 
@@ -5020,12 +5036,12 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="cart-items">
-                    {cart.map((item: OrderItem) => {
+                    {cart.map((item: OrderItem, idx: number) => {
                       const itemPrice = item.custom_modifications ? item.custom_modifications.calculated_price : item.price_at_order;
                       const isMenu = !!item.custom_modifications?.is_menu_order;
                       return (
                         <div 
-                          key={item.item_id} 
+                          key={`${item.item_id}-${idx}`} 
                           className="cart-item" 
                           style={{ cursor: isMenu ? 'default' : 'pointer' }}
                           onClick={() => {
@@ -5084,7 +5100,7 @@ export default function App() {
                               className="cart-item-delete" 
                               onClick={(e) => {
                                 e.stopPropagation();
-                                removeFromCart(item.item_id);
+                                removeFromCart(item);
                               }}
                             >
                               <Trash2 size={14} />
