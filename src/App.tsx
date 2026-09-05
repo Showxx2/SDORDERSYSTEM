@@ -587,6 +587,360 @@ function AppleSelect<T extends string | number>({
   );
 }
 
+function AppleSearchableIngredientForm({
+  db,
+  newItemIngredients,
+  selectedAddIngredientId,
+  setSelectedAddIngredientId,
+  selectedAddIngredientQty,
+  setSelectedAddIngredientQty,
+  onAddIngredient
+}: {
+  db: any;
+  newItemIngredients: any[];
+  selectedAddIngredientId: number | null;
+  setSelectedAddIngredientId: (id: number | null) => void;
+  selectedAddIngredientQty: number | '';
+  setSelectedAddIngredientQty: (qty: number | '') => void;
+  onAddIngredient: (id: number, qty: number) => void;
+}) {
+  const [selectedCategory, setSelectedCategory] = useState<number | 'all'>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isIngredOpen, setIsIngredOpen] = useState(false);
+  const [isCatOpen, setIsCatOpen] = useState(false);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isIngredOpen && !isCatOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsIngredOpen(false);
+        setIsCatOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isIngredOpen, isCatOpen]);
+
+  const categories = db.inventoryCategories || [];
+  const inventory = db.inventory || [];
+
+  // Filter available inventory items
+  const availableInventory = inventory.filter((inv: any) => {
+    // Exclude already added ingredients
+    if (newItemIngredients.some((ing: any) => ing.ingredientId === inv.id)) return false;
+    // Category filter
+    if (selectedCategory !== 'all' && inv.category_id !== selectedCategory) return false;
+    // Search query filter
+    if (searchQuery.trim() !== '') {
+      const q = searchQuery.trim().toLowerCase();
+      const nameMatch = inv.name.toLowerCase().includes(q);
+      const invCat = categories.find((c: any) => c.id === inv.category_id);
+      const catMatch = invCat ? invCat.name.toLowerCase().includes(q) : false;
+      return nameMatch || catMatch;
+    }
+    return true;
+  });
+
+  // Automatically update selectedAddIngredientId if current selection is invalid or null
+  useEffect(() => {
+    const isCurrentlyValid = selectedAddIngredientId !== null && availableInventory.some((i: any) => i.id === selectedAddIngredientId);
+    if (!isCurrentlyValid) {
+      if (availableInventory.length > 0) {
+        setSelectedAddIngredientId(availableInventory[0].id);
+      } else {
+        setSelectedAddIngredientId(null);
+      }
+    }
+  }, [selectedCategory, searchQuery, newItemIngredients]);
+
+  const selectedInvItem = inventory.find((i: any) => i.id === selectedAddIngredientId);
+
+  const categoryOptions = [
+    { value: 'all', label: 'Összes kategória' },
+    ...categories.map((c: any) => ({ value: c.id, label: c.name }))
+  ];
+
+  return (
+    <div 
+      ref={containerRef}
+      style={{ 
+        background: 'rgba(0, 0, 0, 0.15)', 
+        border: '1px solid rgba(255, 255, 255, 0.05)', 
+        borderRadius: '12px', 
+        padding: '20px',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        gap: '16px'
+      }}
+    >
+      <span style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        Új összetevő hozzáadása
+      </span>
+
+      {/* 1. Raktár kategória szűrő */}
+      <div>
+        <label className="input-label" style={{ fontSize: '12px', fontWeight: 600, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px', color: 'rgba(255, 255, 255, 0.8)' }}>
+          <Layers size={13} style={{ color: '#0a84ff' }} /> Raktár kategória
+        </label>
+        <AppleSelect
+          value={selectedCategory}
+          onChange={(val) => {
+            setSelectedCategory(val as number | 'all');
+            setIsCatOpen(false);
+          }}
+          options={categoryOptions}
+          icon={<Layers size={14} />}
+          isOpen={isCatOpen}
+          onToggle={() => {
+            setIsCatOpen(!isCatOpen);
+            if (isIngredOpen) setIsIngredOpen(false);
+          }}
+          onClose={() => setIsCatOpen(false)}
+          openUpward={true}
+        />
+      </div>
+
+      {/* 2. Alapanyag keresése és kiválasztása */}
+      <div>
+        <label className="input-label" style={{ fontSize: '12px', fontWeight: 600, marginBottom: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'rgba(255, 255, 255, 0.8)' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Search size={13} style={{ color: '#0a84ff' }} /> Alapanyag választása & keresése
+          </span>
+          {availableInventory.length > 0 && (
+            <span style={{ fontSize: '11px', opacity: 0.6, fontWeight: 400, color: '#64d2ff' }}>
+              {availableInventory.length} elérhető
+            </span>
+          )}
+        </label>
+
+        <div className="apple-filter-wrapper" style={{ position: 'relative' }}>
+          {/* Search Input Box */}
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <span style={{ position: 'absolute', left: '10px', color: 'rgba(255,255,255,0.4)', pointerEvents: 'none', display: 'flex', alignItems: 'center' }}>
+              <Search size={14} />
+            </span>
+            <input
+              type="text"
+              placeholder="Írj be karaktert a kereséshez..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                if (!isIngredOpen) setIsIngredOpen(true);
+                if (isCatOpen) setIsCatOpen(false);
+              }}
+              onFocus={() => {
+                setIsIngredOpen(true);
+                if (isCatOpen) setIsCatOpen(false);
+              }}
+              style={{
+                width: '100%',
+                height: '38px',
+                paddingLeft: '32px',
+                paddingRight: searchQuery ? '56px' : '32px',
+                fontSize: '12px',
+                borderRadius: '8px',
+                background: 'rgba(0, 0, 0, 0.25)',
+                border: isIngredOpen ? '1px solid var(--primary)' : '1px solid rgba(255, 255, 255, 0.08)',
+                color: 'white',
+                outline: 'none',
+                transition: 'all 0.2s ease',
+                boxShadow: isIngredOpen ? '0 0 8px rgba(0, 113, 227, 0.3)' : 'none'
+              }}
+            />
+
+            {/* Right side controls inside input */}
+            <div style={{ position: 'absolute', right: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  title="Keresés törlése"
+                  style={{ background: 'rgba(255,255,255,0.12)', border: 'none', borderRadius: '50%', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', width: '18px', height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <X size={11} />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsIngredOpen(!isIngredOpen);
+                  if (isCatOpen) setIsCatOpen(false);
+                }}
+                style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,0.45)', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+              >
+                <ChevronDown size={14} style={{ transform: isIngredOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s ease' }} />
+              </button>
+            </div>
+          </div>
+
+          {/* Selected Ingredient Display Chip */}
+          {selectedInvItem && (
+            <div style={{
+              marginTop: '6px',
+              padding: '6px 10px',
+              background: 'rgba(10, 132, 255, 0.12)',
+              border: '1px solid rgba(10, 132, 255, 0.25)',
+              borderRadius: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '11px',
+              color: '#64d2ff'
+            }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <Check size={12} style={{ color: '#30d158', flexShrink: 0 }} />
+                <strong style={{ color: 'white', fontWeight: 600 }}>{selectedInvItem.name}</strong>
+                <span style={{ opacity: 0.7, fontSize: '10px' }}>({selectedInvItem.unit})</span>
+              </span>
+              {selectedInvItem.category_id && (() => {
+                const cat = categories.find((c: any) => c.id === selectedInvItem.category_id);
+                return cat ? (
+                  <span style={{ background: 'rgba(255,255,255,0.1)', padding: '1px 6px', borderRadius: '4px', fontSize: '9px', color: 'rgba(255,255,255,0.8)', flexShrink: 0 }}>
+                    {cat.name}
+                  </span>
+                ) : null;
+              })()}
+            </div>
+          )}
+
+          {/* Dropdown Menu List */}
+          {isIngredOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: 'calc(100% + 6px)',
+                left: 0,
+                right: 0,
+                background: '#1c1c1e',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: '10px',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)',
+                zIndex: 999,
+                maxHeight: '220px',
+                overflowY: 'auto',
+                backdropFilter: 'blur(20px)',
+                padding: '4px'
+              }}
+            >
+              {availableInventory.length > 0 ? (
+                availableInventory.map((inv: any) => {
+                  const isSel = inv.id === selectedAddIngredientId;
+                  const invCat = categories.find((c: any) => c.id === inv.category_id);
+
+                  return (
+                    <div
+                      key={inv.id}
+                      onClick={() => {
+                        setSelectedAddIngredientId(inv.id);
+                        setIsIngredOpen(false);
+                      }}
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        background: isSel ? 'rgba(10, 132, 255, 0.2)' : 'transparent',
+                        color: isSel ? '#64d2ff' : 'white',
+                        fontSize: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isSel) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSel) e.currentTarget.style.background = 'transparent';
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                        <Package size={13} style={{ color: isSel ? '#0a84ff' : 'rgba(255,255,255,0.4)', flexShrink: 0 }} />
+                        <span style={{ fontWeight: isSel ? 600 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {inv.name}
+                        </span>
+                        <span style={{ fontSize: '10px', opacity: 0.5, flexShrink: 0 }}>
+                          ({inv.unit})
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                        {invCat && (
+                          <span style={{ fontSize: '9px', background: 'rgba(255,255,255,0.08)', padding: '2px 6px', borderRadius: '4px', color: 'rgba(255,255,255,0.6)' }}>
+                            {invCat.name}
+                          </span>
+                        )}
+                        {isSel && <Check size={13} style={{ color: '#30d158' }} />}
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12px' }}>
+                  <Search size={18} style={{ opacity: 0.3, marginBottom: '4px', display: 'block', margin: '0 auto' }} />
+                  {searchQuery.trim() !== ''
+                    ? 'Nincs a keresésnek megfelelő alapanyag.'
+                    : 'Nincs több elérhető alapanyag ebben a kategóriában.'}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 3. Mennyiség input */}
+      <div>
+        <label className="input-label" style={{ fontSize: '12px', fontWeight: 600, marginBottom: '6px', display: 'block', color: 'rgba(255, 255, 255, 0.8)' }}>
+          Mennyiség ({selectedInvItem?.unit || 'egység'})
+        </label>
+        <input
+          type="number"
+          className="input-field"
+          style={{ height: '40px', fontSize: '14px', padding: '0 12px', borderRadius: '8px' }}
+          value={selectedAddIngredientQty}
+          onChange={e => setSelectedAddIngredientQty(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
+          step="any"
+        />
+      </div>
+
+      {/* 4. Hozzáadás gomb */}
+      <button
+        type="button"
+        className="btn btn-primary"
+        style={{ height: '42px', padding: '0 20px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', borderRadius: '8px', width: '100%', fontWeight: 600, background: '#0a84ff', border: 'none', cursor: selectedAddIngredientId ? 'pointer' : 'not-allowed', opacity: selectedAddIngredientId ? 1 : 0.5 }}
+        onClick={() => {
+          const qty = Number(selectedAddIngredientQty) || 0;
+          if (!selectedAddIngredientId || qty <= 0) return;
+          
+          onAddIngredient(selectedAddIngredientId, qty);
+          
+          // Clear search query
+          setSearchQuery('');
+          setIsIngredOpen(false);
+
+          // Find next available ingredient
+          const nextAdded = [...newItemIngredients, { ingredientId: selectedAddIngredientId, quantity: qty }];
+          const remaining = inventory.filter((inv: any) => 
+            inv.id !== selectedAddIngredientId && 
+            !nextAdded.some((ing: any) => ing.ingredientId === inv.id) &&
+            (selectedCategory === 'all' || inv.category_id === selectedCategory)
+          );
+          if (remaining.length > 0) {
+            setSelectedAddIngredientId(remaining[0].id);
+          } else {
+            setSelectedAddIngredientId(null);
+          }
+          setSelectedAddIngredientQty(1);
+        }}
+        disabled={!selectedAddIngredientId}
+      >
+        <Plus size={16} /> Alapanyag Hozzáadása
+      </button>
+    </div>
+  );
+}
+
 function isCategoryVisible(category: Category, date: Date = new Date()): boolean {
   if (category.is_active === false) return false;
   if (!category.is_menu_category) return true;
@@ -1208,7 +1562,6 @@ export default function App() {
   const [openPrefixDropdown, setOpenPrefixDropdown] = useState(false);
   const [openItemCatDropdown, setOpenItemCatDropdown] = useState(false);
   const [openItemPackDropdown, setOpenItemPackDropdown] = useState(false);
-  const [openItemIngredDropdown, setOpenItemIngredDropdown] = useState(false);
   const [openInvCatDropdown, setOpenInvCatDropdown] = useState(false);
   const [openInvSupplierDropdown, setOpenInvSupplierDropdown] = useState(false);
   const [openInvFreqDropdown, setOpenInvFreqDropdown] = useState(false);
@@ -1390,7 +1743,13 @@ export default function App() {
   const [filterMaxPrice, setFilterMaxPrice] = useState<number | ''>('');
   const [filterPackType, setFilterPackType] = useState<string | 'all'>('all');
   const [filterAllergen, setFilterAllergen] = useState<string | 'all'>('all');
-  const [openDropdown, setOpenDropdown] = useState<'status' | 'category' | 'pack' | 'allergen' | null>(null);
+  const [openDropdown, setOpenDropdown] = useState<'status' | 'category' | 'pack' | 'allergen' | 'inv_status' | 'inv_category' | null>(null);
+
+  // Inventory Item Filter States
+  const [showInvFilterPanel, setShowInvFilterPanel] = useState(false);
+  const [invFilterStatus, setInvFilterStatus] = useState<'all' | 'active' | 'inactive' | 'low'>('all');
+  const [invFilterCategory, setInvFilterCategory] = useState<string>('all');
+  const [invFilterSearch, setInvFilterSearch] = useState<string>('');
 
   // Daily Close States
   const [startupTime] = useState<Date>(new Date());
@@ -6106,82 +6465,20 @@ export default function App() {
                               </div>
 
                               {/* Column B: Add New Ingredient Form */}
-                              <div style={{ 
-                                background: 'rgba(0, 0, 0, 0.12)', 
-                                border: '1px solid rgba(255, 255, 255, 0.04)', 
-                                borderRadius: '12px', 
-                                padding: '20px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                justifyContent: 'center',
-                                gap: '16px'
-                              }}>
-                                <span style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                  Új összetevő hozzáadása
-                                </span>
-
-                                <div>
-                                  <label className="input-label" style={{ fontSize: '12px', fontWeight: 600, marginBottom: '6px', display: 'block' }}>Alapanyag választása</label>
-                                  <AppleSelect
-                                    value={selectedAddIngredientId || ''}
-                                    onChange={val => setSelectedAddIngredientId(Number(val) || null)}
-                                    options={db.inventory
-                                      .filter((inv: any) => !newItemIngredients.some((ing: any) => ing.ingredientId === inv.id))
-                                      .map((inv: any) => ({
-                                        value: inv.id,
-                                        label: inv.name
-                                      }))
-                                    }
-                                    icon={<Package size={14} />}
-                                    isOpen={openItemIngredDropdown}
-                                    onToggle={() => setOpenItemIngredDropdown(!openItemIngredDropdown)}
-                                    onClose={() => setOpenItemIngredDropdown(false)}
-                                    openUpward={true}
-                                  />
-                                </div>
-
-                                <div>
-                                  <label className="input-label" style={{ fontSize: '12px', fontWeight: 600, marginBottom: '6px', display: 'block' }}>
-                                    Mennyiség ({db.inventory.find((i: any) => i.id === selectedAddIngredientId)?.unit || 'egység'})
-                                  </label>
-                                  <input
-                                    type="number"
-                                    className="input-field"
-                                    style={{ height: '42px', fontSize: '14px', padding: '0 12px', borderRadius: '8px' }}
-                                    value={selectedAddIngredientQty}
-                                    onChange={e => setSelectedAddIngredientQty(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
-                                    step="any"
-                                  />
-                                </div>
-
-                                <button
-                                  type="button"
-                                  className="btn btn-primary"
-                                  style={{ height: '44px', padding: '0 20px', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', borderRadius: '8px', width: '100%', fontWeight: 600 }}
-                                  onClick={() => {
-                                    const qty = Number(selectedAddIngredientQty) || 0;
-                                    if (!selectedAddIngredientId || qty <= 0) return;
-                                    setNewItemIngredients([
-                                      ...newItemIngredients,
-                                      { ingredientId: selectedAddIngredientId, quantity: qty }
-                                    ]);
-                                    // Reset select to next available in inventory
-                                    const remaining = db.inventory.filter((inv: any) => 
-                                      inv.id !== selectedAddIngredientId && 
-                                      !newItemIngredients.some((ing: any) => ing.ingredientId === inv.id)
-                                    );
-                                    if (remaining.length > 0) {
-                                      setSelectedAddIngredientId(remaining[0].id);
-                                    } else {
-                                      setSelectedAddIngredientId(null);
-                                    }
-                                    setSelectedAddIngredientQty('');
-                                  }}
-                                  disabled={!selectedAddIngredientId}
-                                >
-                                  <Plus size={16} /> Alapanyag Hozzáadása
-                                </button>
-                              </div>
+                              <AppleSearchableIngredientForm
+                                db={db}
+                                newItemIngredients={newItemIngredients}
+                                selectedAddIngredientId={selectedAddIngredientId}
+                                setSelectedAddIngredientId={setSelectedAddIngredientId}
+                                selectedAddIngredientQty={selectedAddIngredientQty}
+                                setSelectedAddIngredientQty={setSelectedAddIngredientQty}
+                                onAddIngredient={(ingId, qty) => {
+                                  setNewItemIngredients([
+                                    ...newItemIngredients,
+                                    { ingredientId: ingId, quantity: qty }
+                                  ]);
+                                }}
+                              />
                             </div>
                           )}
 
@@ -7699,165 +7996,178 @@ export default function App() {
                 return (
                   <>
                     {/* Unified Header matching Étlap szerkesztése exactly (separating line at the very bottom of the entire block) */}
-                    <div className="admin-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '16px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <h2 className="admin-title" style={{ color: 'white', fontSize: '24px', fontWeight: 800, margin: 0 }}>Raktár & Készlet szerkesztése</h2>
+                    <div className="admin-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '16px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                        <h2 className="admin-title" style={{ margin: 0 }}>Raktár & Készlet szerkesztése</h2>
                         
-                        {/* Segmented Control Switcher (Pill style container matching menu editor) */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div className="menu-sliding-toggle-container" style={{ height: '38px', alignItems: 'center' }}>
-                            <div 
-                              className="menu-sliding-toggle-indicator" 
-                              style={{
+                        {/* Sliding tab selector & Filter Button on the left, Action Button on the right */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div className="menu-sliding-toggle-container" style={{ height: '38px', alignItems: 'center' }}>
+                              <div 
+                                className="menu-sliding-toggle-indicator" 
+                                style={{
+                                  position: 'absolute',
+                                  top: '4px',
+                                  bottom: '4px',
+                                  borderRadius: '25px',
+                                  transition: 'all 0.35s cubic-bezier(0.25, 1, 0.5, 1)',
+                                  zIndex: 1,
+                                  ...(inventorySubTab === 'items' ? {
+                                    left: '4px',
+                                    width: '120px',
+                                    background: 'linear-gradient(135deg, #0071e3, #5ac8fa)',
+                                    boxShadow: '0 0 12px rgba(0, 113, 227, 0.45)'
+                                  } : inventorySubTab === 'categories' ? {
+                                    left: '128px',
+                                    width: '110px',
+                                    background: 'linear-gradient(135deg, #bf5af2, #af52de)',
+                                    boxShadow: '0 0 12px rgba(191, 90, 242, 0.45)'
+                                  } : {
+                                    left: '242px',
+                                    width: '160px',
+                                    background: 'linear-gradient(135deg, #ffcc00, #ff9f0a)',
+                                    boxShadow: '0 0 12px rgba(255, 204, 0, 0.45)'
+                                  })
+                                }}
+                              />
+                              <button
+                                className={`menu-sliding-toggle-btn ${inventorySubTab === 'items' ? 'active' : ''}`}
+                                style={{ width: '120px', height: '30px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', outline: 'none' }}
+                                onClick={() => setInventorySubTab('items')}
+                              >
+                                Raktárcikkek
+                              </button>
+                              <button
+                                className={`menu-sliding-toggle-btn ${inventorySubTab === 'categories' ? 'active' : ''}`}
+                                style={{ width: '110px', height: '30px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', outline: 'none' }}
+                                onClick={() => setInventorySubTab('categories')}
+                              >
+                                Kategóriák
+                              </button>
+                              <button
+                                className={`menu-sliding-toggle-btn ${inventorySubTab === 'suppliers' ? 'active suppliers-active' : ''}`}
+                                style={{ width: '160px', height: '30px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', outline: 'none' }}
+                                onClick={() => setInventorySubTab('suppliers')}
+                              >
+                                Beszerzési helyek
+                              </button>
+                            </div>
+
+                            {inventorySubTab === 'items' && (
+                              <button 
+                                onClick={() => setShowInvFilterPanel(!showInvFilterPanel)}
+                                className={`filter-toggle-btn ${showInvFilterPanel ? 'active' : ''}`}
+                                title="Szűrés és Rendezés"
+                              >
+                                <SlidersHorizontal size={14} style={{ flexShrink: 0 }} />
+                                <span className="filter-toggle-text">Szűrés és Rendezés</span>
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Sliding Action Buttons for Warehouse (aligned and matching height of 38px) */}
+                          <div style={{ position: 'relative', height: '38px', width: '260px' }}>
+                            <button 
+                              className="btn btn-warehouse-add-items" 
+                              style={{ 
                                 position: 'absolute',
-                                top: '4px',
-                                bottom: '4px',
-                                borderRadius: '25px',
+                                right: 0,
+                                top: 0,
+                                height: '38px',
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '6px', 
+                                padding: '0 14px', 
+                                fontSize: '13px', 
+                                borderRadius: 'var(--radius-md)', 
+                                fontWeight: 600, 
+                                border: 'none', 
+                                cursor: 'pointer',
                                 transition: 'all 0.35s cubic-bezier(0.25, 1, 0.5, 1)',
-                                zIndex: 1,
-                                ...(inventorySubTab === 'items' ? {
-                                  left: '4px',
-                                  width: '120px',
-                                  background: 'linear-gradient(135deg, #0071e3, #5ac8fa)',
-                                  boxShadow: '0 0 12px rgba(0, 113, 227, 0.45)'
-                                } : inventorySubTab === 'categories' ? {
-                                  left: '128px',
-                                  width: '110px',
-                                  background: 'linear-gradient(135deg, #bf5af2, #af52de)',
-                                  boxShadow: '0 0 12px rgba(191, 90, 242, 0.45)'
-                                } : {
-                                  left: '242px',
-                                  width: '160px',
-                                  background: 'linear-gradient(135deg, #ffcc00, #ff9f0a)',
-                                  boxShadow: '0 0 12px rgba(255, 204, 0, 0.45)'
-                                })
+                                opacity: inventorySubTab === 'items' ? 1 : 0,
+                                transform: inventorySubTab === 'items' ? 'translateX(0)' : 'translateX(20px)',
+                                pointerEvents: inventorySubTab === 'items' ? 'auto' : 'none'
                               }}
-                            />
-                            <button
-                              className={`menu-sliding-toggle-btn ${inventorySubTab === 'items' ? 'active' : ''}`}
-                              style={{ width: '120px', height: '30px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', outline: 'none' }}
-                              onClick={() => setInventorySubTab('items')}
+                              onClick={() => {
+                                setInvItemName('');
+                                setInvItemCategoryId('none');
+                                setInvItemQuantity(0);
+                                setInvItemUnit('kg');
+                                setInvItemWarningLimit(0);
+                                setInvItemSupplierId(suppliers[0]?.id || '');
+                                setInvItemFreqValue(7);
+                                setInvItemFreqUnit('day');
+                                setInvItemProcurement(false);
+                                setInvItemDoubleExtraPrice(0);
+                                setEditingInvItem({ id: 'NEW', quantity: 0 });
+                              }}
                             >
-                              Raktárcikkek
+                              <Plus size={16} /> Új raktárcikk hozzáadása
                             </button>
-                            <button
-                              className={`menu-sliding-toggle-btn ${inventorySubTab === 'categories' ? 'active' : ''}`}
-                              style={{ width: '110px', height: '30px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', outline: 'none' }}
-                              onClick={() => setInventorySubTab('categories')}
+
+                            <button 
+                              className="btn btn-warehouse-add-categories" 
+                              style={{ 
+                                position: 'absolute',
+                                right: 0,
+                                top: 0,
+                                height: '38px',
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '6px', 
+                                padding: '0 14px', 
+                                fontSize: '13px', 
+                                borderRadius: 'var(--radius-md)', 
+                                fontWeight: 600, 
+                                border: 'none', 
+                                cursor: 'pointer',
+                                transition: 'all 0.35s cubic-bezier(0.25, 1, 0.5, 1)',
+                                opacity: inventorySubTab === 'categories' ? 1 : 0,
+                                transform: inventorySubTab === 'categories' ? 'translateX(0)' : inventorySubTab === 'items' ? 'translateX(-20px)' : 'translateX(20px)',
+                                pointerEvents: inventorySubTab === 'categories' ? 'auto' : 'none'
+                              }}
+                              onClick={() => {
+                                setInvCatName('');
+                                setInvCatDescription('');
+                                setEditingInvCat({ id: 'NEW' });
+                              }}
                             >
-                              Kategóriák
+                              <Plus size={16} /> Új kategória hozzáadása
                             </button>
-                            <button
-                              className={`menu-sliding-toggle-btn ${inventorySubTab === 'suppliers' ? 'active suppliers-active' : ''}`}
-                              style={{ width: '160px', height: '30px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', outline: 'none' }}
-                              onClick={() => setInventorySubTab('suppliers')}
+
+                            <button 
+                              className="btn btn-warehouse-add-suppliers" 
+                              style={{ 
+                                position: 'absolute',
+                                right: 0,
+                                top: 0,
+                                height: '38px',
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '6px', 
+                                padding: '0 14px', 
+                                fontSize: '13px', 
+                                borderRadius: 'var(--radius-md)', 
+                                fontWeight: 600, 
+                                border: 'none', 
+                                cursor: 'pointer',
+                                transition: 'all 0.35s cubic-bezier(0.25, 1, 0.5, 1)',
+                                opacity: inventorySubTab === 'suppliers' ? 1 : 0,
+                                transform: inventorySubTab === 'suppliers' ? 'translateX(0)' : 'translateX(-20px)',
+                                pointerEvents: inventorySubTab === 'suppliers' ? 'auto' : 'none'
+                              }}
+                              onClick={() => {
+                                setSupplierName('');
+                                setSupplierAddress('');
+                                setSupplierDescription('');
+                                setEditingSupplier({ id: 'NEW' });
+                              }}
                             >
-                              Beszerzési helyek
+                              <Plus size={16} /> Új Beszerzési hely
                             </button>
                           </div>
                         </div>
-                      </div>
-
-                      {/* Sliding Action Buttons for Warehouse (aligned and matching height of 38px) */}
-                      <div style={{ position: 'relative', height: '38px', width: '260px' }}>
-                        <button 
-                          className="btn btn-warehouse-add-items" 
-                          style={{ 
-                            position: 'absolute',
-                            right: 0,
-                            top: 0,
-                            height: '38px',
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '6px', 
-                            padding: '0 14px', 
-                            fontSize: '13px', 
-                            borderRadius: 'var(--radius-md)', 
-                            fontWeight: 600, 
-                            border: 'none', 
-                            cursor: 'pointer',
-                            transition: 'all 0.35s cubic-bezier(0.25, 1, 0.5, 1)',
-                            opacity: inventorySubTab === 'items' ? 1 : 0,
-                            transform: inventorySubTab === 'items' ? 'translateX(0)' : 'translateX(20px)',
-                            pointerEvents: inventorySubTab === 'items' ? 'auto' : 'none'
-                          }}
-                          onClick={() => {
-                            setInvItemName('');
-                            setInvItemCategoryId('none');
-                            setInvItemQuantity(0);
-                            setInvItemUnit('kg');
-                            setInvItemWarningLimit(0);
-                            setInvItemSupplierId(suppliers[0]?.id || '');
-                            setInvItemFreqValue(7);
-                            setInvItemFreqUnit('day');
-                            setInvItemProcurement(false);
-                            setInvItemDoubleExtraPrice(0);
-                            setEditingInvItem({ id: 'NEW', quantity: 0 });
-                          }}
-                        >
-                          <Plus size={16} /> Új raktárcikk hozzáadása
-                        </button>
-
-                        <button 
-                          className="btn btn-warehouse-add-categories" 
-                          style={{ 
-                            position: 'absolute',
-                            right: 0,
-                            top: 0,
-                            height: '38px',
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '6px', 
-                            padding: '0 14px', 
-                            fontSize: '13px', 
-                            borderRadius: 'var(--radius-md)', 
-                            fontWeight: 600, 
-                            border: 'none', 
-                            cursor: 'pointer',
-                            transition: 'all 0.35s cubic-bezier(0.25, 1, 0.5, 1)',
-                            opacity: inventorySubTab === 'categories' ? 1 : 0,
-                            transform: inventorySubTab === 'categories' ? 'translateX(0)' : inventorySubTab === 'items' ? 'translateX(-20px)' : 'translateX(20px)',
-                            pointerEvents: inventorySubTab === 'categories' ? 'auto' : 'none'
-                          }}
-                          onClick={() => {
-                            setInvCatName('');
-                            setInvCatDescription('');
-                            setEditingInvCat({ id: 'NEW' });
-                          }}
-                        >
-                          <Plus size={16} /> Új kategória hozzáadása
-                        </button>
-
-                        <button 
-                          className="btn btn-warehouse-add-suppliers" 
-                          style={{ 
-                            position: 'absolute',
-                            right: 0,
-                            top: 0,
-                            height: '38px',
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '6px', 
-                            padding: '0 14px', 
-                            fontSize: '13px', 
-                            borderRadius: 'var(--radius-md)', 
-                            fontWeight: 600, 
-                            border: 'none', 
-                            cursor: 'pointer',
-                            transition: 'all 0.35s cubic-bezier(0.25, 1, 0.5, 1)',
-                            opacity: inventorySubTab === 'suppliers' ? 1 : 0,
-                            transform: inventorySubTab === 'suppliers' ? 'translateX(0)' : 'translateX(-20px)',
-                            pointerEvents: inventorySubTab === 'suppliers' ? 'auto' : 'none'
-                          }}
-                          onClick={() => {
-                            setSupplierName('');
-                            setSupplierAddress('');
-                            setSupplierDescription('');
-                            setEditingSupplier({ id: 'NEW' });
-                          }}
-                        >
-                          <Plus size={16} /> Új Beszerzési hely
-                        </button>
                       </div>
                     </div>
 
@@ -7871,6 +8181,60 @@ export default function App() {
                       }}>
                         {/* Left Slide: Raktárcikkek table */}
                         <div style={{ width: '33.333%', flexShrink: 0, paddingRight: '12px' }}>
+                          
+                          {/* Filter Panel for Inventory */}
+                          <div className={`admin-filter-panel ${showInvFilterPanel ? 'show' : ''}`}>
+                            <div className="filter-grid">
+                              <div className="filter-group">
+                                <label className="filter-label">Állapot</label>
+                                <AppleSelect
+                                  value={invFilterStatus}
+                                  onChange={setInvFilterStatus}
+                                  options={[
+                                    { value: 'all', label: 'Mindegyik' },
+                                    { value: 'active', label: 'Csak aktív' },
+                                    { value: 'inactive', label: 'Csak rejtett' },
+                                    { value: 'low', label: 'Alacsony / Elfogyott' }
+                                  ]}
+                                  icon={<Activity size={14} />}
+                                  isOpen={openDropdown === 'inv_status'}
+                                  onToggle={() => setOpenDropdown(openDropdown === 'inv_status' ? null : 'inv_status')}
+                                  onClose={() => setOpenDropdown(null)}
+                                />
+                              </div>
+
+                              <div className="filter-group">
+                                <label className="filter-label">Kategória</label>
+                                <AppleSelect
+                                  value={invFilterCategory}
+                                  onChange={setInvFilterCategory}
+                                  options={[
+                                    { value: 'all', label: 'Összes kategória' },
+                                    ...invCategories.map((c: any) => ({ value: String(c.id), label: c.name }))
+                                  ]}
+                                  icon={<Layers size={14} />}
+                                  isOpen={openDropdown === 'inv_category'}
+                                  onToggle={() => setOpenDropdown(openDropdown === 'inv_category' ? null : 'inv_category')}
+                                  onClose={() => setOpenDropdown(null)}
+                                />
+                              </div>
+
+                              <div className="filter-group">
+                                <label className="filter-label">Keresés</label>
+                                <div className="apple-filter-wrapper">
+                                  <span className="apple-filter-icon"><Search size={14} /></span>
+                                  <input 
+                                    type="text" 
+                                    className="apple-filter-input" 
+                                    placeholder="Név keresése..."
+                                    value={invFilterSearch}
+                                    onChange={(e) => setInvFilterSearch(e.target.value)}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
                           <div className="table-container" style={{ maxHeight: 'calc(100vh - 310px)', overflowY: 'auto', paddingBottom: '10px' }}>
                             <table className="admin-table">
                               <thead>
@@ -7886,7 +8250,20 @@ export default function App() {
                                 </tr>
                               </thead>
                               <tbody>
-                                {inventory.map((inv: any) => {
+                                {inventory.filter((inv: any) => {
+                                  if (invFilterStatus === 'active' && inv.is_active === false) return false;
+                                  if (invFilterStatus === 'inactive' && inv.is_active !== false) return false;
+                                  if (invFilterStatus === 'low') {
+                                    const isLow = inv.quantity <= (inv.warning_limit || 0) || inv.quantity <= 0;
+                                    if (!isLow) return false;
+                                  }
+                                  if (invFilterCategory !== 'all' && String(inv.category_id) !== String(invFilterCategory)) return false;
+                                  if (invFilterSearch.trim() !== '') {
+                                    const q = invFilterSearch.toLowerCase().trim();
+                                    if (!(inv.name || '').toLowerCase().includes(q)) return false;
+                                  }
+                                  return true;
+                                }).map((inv: any) => {
                                   const category = invCategories.find((c: any) => c.id === inv.category_id);
                                   const supplier = suppliers.find((s: any) => s.id === inv.supplier_id);
                                   const isInactive = inv.is_active === false;
