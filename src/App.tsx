@@ -7994,7 +7994,7 @@ export default function App() {
                 };
 
                 return (
-                  <>
+                  <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 112px)', overflow: 'hidden' }}>
                     {/* Unified Header matching Étlap szerkesztése exactly (separating line at the very bottom of the entire block) */}
                     <div className="admin-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', paddingBottom: '16px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
@@ -8172,15 +8172,16 @@ export default function App() {
                     </div>
 
                     {/* Sliding Container for Tables (smooth horizontal switch for 3 tabs) */}
-                    <div style={{ overflow: 'hidden', width: '100%', borderRadius: 'var(--radius-md)' }}>
+                    <div style={{ overflow: 'hidden', width: '100%', flex: 1, minHeight: 0, borderRadius: 'var(--radius-md)' }}>
                       <div style={{ 
                         display: 'flex', 
                         width: '300%', 
+                        height: '100%',
                         transform: inventorySubTab === 'items' ? 'translateX(0%)' : inventorySubTab === 'categories' ? 'translateX(-33.333%)' : 'translateX(-66.666%)', 
                         transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)' 
                       }}>
                         {/* Left Slide: Raktárcikkek table */}
-                        <div style={{ width: '33.333%', flexShrink: 0, paddingRight: '12px' }}>
+                        <div style={{ width: '33.333%', flexShrink: 0, paddingRight: '12px', display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
                           
                           {/* Filter Panel for Inventory */}
                           <div className={`admin-filter-panel ${showInvFilterPanel ? 'show' : ''}`}>
@@ -8235,7 +8236,7 @@ export default function App() {
                             </div>
                           </div>
 
-                          <div className="table-container" style={{ maxHeight: 'calc(100vh - 310px)', overflowY: 'auto', paddingBottom: '10px' }}>
+                          <div className="table-container" style={{ flex: 1, overflowY: 'auto', paddingBottom: '10px' }}>
                             <table className="admin-table">
                               <thead>
                                 <tr>
@@ -8353,8 +8354,8 @@ export default function App() {
                         </div>
 
                         {/* Middle Slide: Kategóriák table */}
-                        <div style={{ width: '33.333%', flexShrink: 0, paddingLeft: '12px', paddingRight: '12px' }}>
-                          <div className="table-container" style={{ maxHeight: 'calc(100vh - 310px)', overflowY: 'auto', paddingBottom: '10px' }}>
+                        <div style={{ width: '33.333%', flexShrink: 0, paddingLeft: '12px', paddingRight: '12px', display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+                          <div className="table-container" style={{ flex: 1, overflowY: 'auto', paddingBottom: '10px' }}>
                             <table className="admin-table">
                               <thead>
                                 <tr>
@@ -8443,8 +8444,8 @@ export default function App() {
                         </div>
 
                         {/* Right Slide: Beszerzési helyek table */}
-                        <div style={{ width: '33.333%', flexShrink: 0, paddingLeft: '12px' }}>
-                          <div className="table-container" style={{ maxHeight: 'calc(100vh - 310px)', overflowY: 'auto', paddingBottom: '10px' }}>
+                        <div style={{ width: '33.333%', flexShrink: 0, paddingLeft: '12px', display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+                          <div className="table-container" style={{ flex: 1, overflowY: 'auto', paddingBottom: '10px' }}>
                             <table className="admin-table">
                               <thead>
                                 <tr>
@@ -8931,7 +8932,7 @@ export default function App() {
                         </div>
                       </div>
                     )}
-                  </>
+                  </div>
                 );
               })()}
 
