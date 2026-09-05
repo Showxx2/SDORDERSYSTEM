@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Settings, User, Search, Send, X, Plus, Trash2, Lock, Info, 
+  Settings, User, Search, Send, X, Plus, Trash2, Pencil, Lock, Info, 
   History, Sparkles, TrendingUp, Layers, Package, Shield, 
   SendHorizontal, Truck, LogOut, 
   FileText, ChevronLeft, Percent, CreditCard, Wallet, 
@@ -7641,41 +7641,49 @@ export default function App() {
                                       </button>
                                     </td>
                                     <td style={{ textAlign: 'right', verticalAlign: 'middle' }}>
-                                      <button 
-                                        className="btn" 
-                                        style={{ padding: '6px 14px', fontSize: '12px', background: 'rgba(255,255,255,0.06)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', marginRight: '6px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s ease' }}
-                                        onClick={() => {
-                                          setEditingItem(item);
-                                          setNewItemName(item.name);
-                                          setNewItemPrice(item.price);
-                                          setNewItemPackFee(item.packaging_fee);
-                                          setNewItemPackType(item.packaging_type || 'none');
-                                          setNewItemCatId(item.category_id);
-                                          setNewItemDescription(item.description || '');
-                                          setNewItemIngredients(item.ingredients || []);
-                                          if (db.inventory.length > 0) {
-                                            setSelectedAddIngredientId(db.inventory[0].id);
-                                            setSelectedAddIngredientQty(1);
-                                          } else {
-                                            setSelectedAddIngredientId(null);
-                                            setSelectedAddIngredientQty(0);
-                                          }
-                                        }}
-                                      >
-                                        Szerkesztés
-                                      </button>
-                                      <button 
-                                        className="btn" 
-                                        style={{ padding: '6px 14px', fontSize: '12px', background: 'rgba(255,69,58,0.12)', color: '#ff453a', border: '1px solid rgba(255,69,58,0.25)', borderRadius: '20px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s ease' }}
-                                        onClick={() => {
-                                          customConfirm(`Biztosan törlöd a(z) "${item.name}" ételt?`, () => {
-                                            const updated = db.items.filter((i: any) => i.id !== item.id);
-                                            saveDatabase({ ...db, items: updated });
-                                          });
-                                        }}
-                                      >
-                                        Törlés
-                                      </button>
+                                      <div className="apple-action-btn-group">
+                                        <button 
+                                          className="apple-table-action-btn edit-btn"
+                                          title="Szerkesztés"
+                                          onClick={() => {
+                                            setEditingItem(item);
+                                            setNewItemName(item.name);
+                                            setNewItemPrice(item.price);
+                                            setNewItemPackFee(item.packaging_fee);
+                                            setNewItemPackType(item.packaging_type || 'none');
+                                            setNewItemCatId(item.category_id);
+                                            setNewItemDescription(item.description || '');
+                                            setNewItemIngredients(item.ingredients || []);
+                                            if (db.inventory.length > 0) {
+                                              setSelectedAddIngredientId(db.inventory[0].id);
+                                              setSelectedAddIngredientQty(1);
+                                            } else {
+                                              setSelectedAddIngredientId(null);
+                                              setSelectedAddIngredientQty(0);
+                                            }
+                                          }}
+                                        >
+                                          <div className="btn-icon-box">
+                                            <Pencil size={13} className="btn-icon" />
+                                          </div>
+                                          <span className="btn-text">Szerkesztés</span>
+                                        </button>
+                                        <button 
+                                          className="apple-table-action-btn delete-btn"
+                                          title="Törlés"
+                                          onClick={() => {
+                                            customConfirm(`Biztosan törlöd a(z) "${item.name}" ételt?`, () => {
+                                              const updated = db.items.filter((i: any) => i.id !== item.id);
+                                              saveDatabase({ ...db, items: updated });
+                                            });
+                                          }}
+                                        >
+                                          <div className="btn-icon-box">
+                                            <Trash2 size={13} className="btn-icon" />
+                                          </div>
+                                          <span className="btn-text">Törlés</span>
+                                        </button>
+                                      </div>
                                     </td>
                                   </tr>
                                   );
@@ -7720,33 +7728,41 @@ export default function App() {
                                         <span style={{ fontWeight: 600, fontSize: '12px' }}>{isHidden ? "Kikapcsolva" : "Aktív"}</span>
                                       </button>
                                     </td>
-                                    <td style={{ textAlign: 'right' }}>
-                                      <button 
-                                        className="btn" 
-                                        style={{ padding: '6px 14px', fontSize: '12px', background: 'rgba(255,255,255,0.06)', color: 'white', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px', marginRight: '6px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s ease' }}
-                                        onClick={() => {
-                                          setEditingCategory(cat);
-                                          setEditingCategoryTab('general');
-                                          setNewCatName(cat.name);
-                                          setNewCatDescription(cat.description || '');
-                                          setNewCatLinkedCategoryId(cat.linked_category_id !== undefined && cat.linked_category_id !== null ? cat.linked_category_id : 'none');
-                                          setNewCatIncludeLinkedPackagingFee(cat.include_linked_packaging_fee || false);
-                                        }}
-                                      >
-                                        Szerkesztés
-                                      </button>
-                                      <button 
-                                        className="btn" 
-                                        style={{ padding: '6px 14px', fontSize: '12px', background: 'rgba(255,69,58,0.12)', color: '#ff453a', border: '1px solid rgba(255,69,58,0.25)', borderRadius: '20px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s ease' }}
-                                        onClick={() => {
-                                          customConfirm(`Biztosan törlöd a(z) "${cat.name}" kategóriát? A benne lévő ételek kategória nélkül maradnak.`, () => {
-                                            const updated = db.categories.filter((c: any) => c.id !== cat.id);
-                                            saveDatabase({ ...db, categories: updated });
-                                          });
-                                        }}
-                                      >
-                                        Törlés
-                                      </button>
+                                    <td style={{ textAlign: 'right', verticalAlign: 'middle' }}>
+                                      <div className="apple-action-btn-group">
+                                        <button 
+                                          className="apple-table-action-btn edit-btn"
+                                          title="Szerkesztés"
+                                          onClick={() => {
+                                            setEditingCategory(cat);
+                                            setEditingCategoryTab('general');
+                                            setNewCatName(cat.name);
+                                            setNewCatDescription(cat.description || '');
+                                            setNewCatLinkedCategoryId(cat.linked_category_id !== undefined && cat.linked_category_id !== null ? cat.linked_category_id : 'none');
+                                            setNewCatIncludeLinkedPackagingFee(cat.include_linked_packaging_fee || false);
+                                          }}
+                                        >
+                                          <div className="btn-icon-box">
+                                            <Pencil size={13} className="btn-icon" />
+                                          </div>
+                                          <span className="btn-text">Szerkesztés</span>
+                                        </button>
+                                        <button 
+                                          className="apple-table-action-btn delete-btn"
+                                          title="Törlés"
+                                          onClick={() => {
+                                            customConfirm(`Biztosan törlöd a(z) "${cat.name}" kategóriát? A benne lévő ételek kategória nélkül maradnak.`, () => {
+                                              const updated = db.categories.filter((c: any) => c.id !== cat.id);
+                                              saveDatabase({ ...db, categories: updated });
+                                            });
+                                          }}
+                                        >
+                                          <div className="btn-icon-box">
+                                            <Trash2 size={13} className="btn-icon" />
+                                          </div>
+                                          <span className="btn-text">Törlés</span>
+                                        </button>
+                                      </div>
                                     </td>
                                   </tr>
                                 );

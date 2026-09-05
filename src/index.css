@@ -1073,6 +1073,102 @@ body {
   background: rgba(255, 255, 255, 0.02);
 }
 
+/* Apple Expandable Table Action Buttons */
+.apple-action-btn-group {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.apple-table-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  height: 32px;
+  width: 32px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: white;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 0.25s ease,
+              border-color 0.25s ease,
+              box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.25s ease;
+  box-sizing: border-box;
+  user-select: none;
+  outline: none;
+  position: relative;
+  vertical-align: middle;
+}
+
+.apple-table-action-btn .btn-icon-box {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.apple-table-action-btn .btn-icon {
+  flex-shrink: 0;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.apple-table-action-btn .btn-text {
+  opacity: 0;
+  max-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              max-width 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              padding-right 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  padding-right: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+}
+
+/* Hover States with distinct widths per action type */
+.apple-table-action-btn.edit-btn:hover {
+  width: 112px;
+  background: rgba(10, 132, 255, 0.2);
+  color: #64d2ff;
+  border-color: rgba(10, 132, 255, 0.45);
+  box-shadow: 0 4px 14px rgba(10, 132, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.apple-table-action-btn.delete-btn:hover {
+  width: 90px;
+  background: rgba(255, 69, 58, 0.22);
+  color: #ff453a;
+  border-color: rgba(255, 69, 58, 0.45);
+  box-shadow: 0 4px 14px rgba(255, 69, 58, 0.3);
+  transform: translateY(-1px);
+}
+
+.apple-table-action-btn:hover .btn-text {
+  opacity: 1;
+  max-width: 90px;
+  padding-right: 12px;
+}
+
+.apple-table-action-btn:hover .btn-icon {
+  transform: scale(1.1);
+}
+
+.apple-table-action-btn:active {
+  transform: scale(0.95) translateY(0);
+}
+
 /* Modal overlays (for unified single-window configurations like customer details, payments, etc.) */
 .modal-overlay {
   position: absolute;
