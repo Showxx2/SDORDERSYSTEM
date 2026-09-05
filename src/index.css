@@ -1073,7 +1073,7 @@ body {
   background: rgba(255, 255, 255, 0.02);
 }
 
-/* Apple macOS 3D Liquid Glass Action Buttons */
+/* Liquid Glass Banner UI & Action Buttons (Ref images 1-5) */
 .apple-action-btn-group {
   display: flex;
   align-items: center;
@@ -1087,15 +1087,15 @@ body {
   justify-content: flex-start;
   height: 34px;
   width: 34px;
-  border-radius: 10px; /* macOS squircle container */
+  border-radius: 10px; /* Liquid Glass squircle container (ref images 4 & 5) */
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-  color: white;
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  color: #ffffff;
   overflow: hidden;
   white-space: nowrap;
   box-sizing: border-box;
@@ -1103,6 +1103,9 @@ body {
   outline: none;
   position: relative;
   vertical-align: middle;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.45),
+              inset 0 -1px 2px 0 rgba(0, 0, 0, 0.2),
+              0 4px 14px rgba(0, 0, 0, 0.25);
   transition: width 0.38s cubic-bezier(0.16, 1, 0.3, 1),
               background 0.3s ease,
               border-color 0.3s ease,
@@ -1110,43 +1113,19 @@ body {
               transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* 3D Glass Icon Badge (left side macOS squircle badge) */
 .apple-table-action-btn .btn-icon-box {
-  width: 32px;
-  height: 32px;
+  width: 31px;
+  height: 31px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  border-radius: 8px;
-  position: relative;
-  overflow: hidden;
-  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.45),
-              inset 0 -1px 2px 0 rgba(0, 0, 0, 0.25),
-              0 2px 6px rgba(0, 0, 0, 0.35);
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* Glass Sheen Reflection Curve inside the 3D Icon Badge */
-.apple-table-action-btn .btn-icon-box::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 50%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.05) 100%);
-  border-radius: 8px 8px 50% 50%;
-  pointer-events: none;
 }
 
 .apple-table-action-btn .btn-icon {
   flex-shrink: 0;
-  color: #ffffff;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
-  position: relative;
-  z-index: 2;
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  stroke-width: 2.2px; /* Crisp vector stroke as seen in ref images 1, 4, 5 */
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), color 0.25s ease, filter 0.25s ease;
 }
 
 .apple-table-action-btn .btn-text {
@@ -1165,42 +1144,56 @@ body {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
-/* Edit Variant (Apple Sapphire Blue 3D Glass Badge) */
+/* Edit Variant (Liquid Cyan Glass - Ref image 1 & 5) */
 .apple-table-action-btn.edit-btn {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(90, 200, 250, 0.35);
+  background: rgba(90, 200, 250, 0.08);
+  color: #64d2ff;
 }
 
-.apple-table-action-btn.edit-btn .btn-icon-box {
-  background: linear-gradient(135deg, #0071e3 0%, #5ac8fa 100%);
-  border: 1px solid rgba(255, 255, 255, 0.35);
+.apple-table-action-btn.edit-btn .btn-icon {
+  color: #64d2ff;
+  filter: drop-shadow(0 1px 3px rgba(10, 132, 255, 0.4));
 }
 
 .apple-table-action-btn.edit-btn:hover {
-  width: 116px;
-  background: rgba(0, 113, 227, 0.25);
-  border-color: rgba(90, 200, 250, 0.5);
-  box-shadow: 0 4px 16px rgba(0, 113, 227, 0.35);
+  width: 114px;
+  background: rgba(10, 132, 255, 0.25);
+  border-color: rgba(90, 200, 250, 0.65);
+  box-shadow: inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.6),
+              0 6px 20px rgba(0, 113, 227, 0.4);
+  color: #ffffff;
   transform: translateY(-1px);
 }
 
-/* Delete Variant (Apple Ruby Red 3D Glass Badge) */
-.apple-table-action-btn.delete-btn {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
+.apple-table-action-btn.edit-btn:hover .btn-icon {
+  color: #ffffff;
 }
 
-.apple-table-action-btn.delete-btn .btn-icon-box {
-  background: linear-gradient(135deg, #ff3b30 0%, #ff6b60 100%);
-  border: 1px solid rgba(255, 255, 255, 0.35);
+/* Delete Variant (Liquid Red/Salmon Glass - Ref image 2 & 3) */
+.apple-table-action-btn.delete-btn {
+  border-color: rgba(255, 69, 58, 0.35);
+  background: rgba(255, 69, 58, 0.08);
+  color: #ff6b60;
+}
+
+.apple-table-action-btn.delete-btn .btn-icon {
+  color: #ff6b60;
+  filter: drop-shadow(0 1px 3px rgba(255, 69, 58, 0.4));
 }
 
 .apple-table-action-btn.delete-btn:hover {
-  width: 94px;
+  width: 92px;
   background: rgba(255, 59, 48, 0.25);
-  border-color: rgba(255, 107, 96, 0.5);
-  box-shadow: 0 4px 16px rgba(255, 59, 48, 0.35);
+  border-color: rgba(255, 107, 96, 0.65);
+  box-shadow: inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.6),
+              0 6px 20px rgba(255, 59, 48, 0.4);
+  color: #ffffff;
   transform: translateY(-1px);
+}
+
+.apple-table-action-btn.delete-btn:hover .btn-icon {
+  color: #ffffff;
 }
 
 .apple-table-action-btn:hover .btn-text {
@@ -1209,8 +1202,8 @@ body {
   padding-right: 12px;
 }
 
-.apple-table-action-btn:hover .btn-icon-box {
-  transform: scale(1.06);
+.apple-table-action-btn:hover .btn-icon {
+  transform: scale(1.08);
 }
 
 .apple-table-action-btn:active {
